@@ -19,6 +19,11 @@
 #include "fg2/details/ResourceNode.h"
 #include "fg2/details/DependencyGraph.h"
 
+#include "details/Engine.h"
+
+#include <backend/DriverEnums.h>
+#include <backend/Handle.h>
+
 namespace filament::fg2 {
 
 FrameGraph::Builder::Builder(FrameGraph& fg, PassNode& pass) noexcept
@@ -43,25 +48,73 @@ FrameGraph::FrameGraph(ResourceAllocatorInterface& resourceAllocator)
 FrameGraph::~FrameGraph() = default;
 
 FrameGraph& FrameGraph::compile() noexcept {
-    mGraph.cull();
-    mGraph.export_graphviz(utils::slog.d);
+    DependencyGraph& dependencyGraph = mGraph;
+
+    // first we cull unreachable nodes
+    dependencyGraph.cull();
+
+    // update the reference counter of the resource themselves
+    for (auto& pNode : mResourceNodes) {
+        VirtualResource* pResource = getResource(pNode->resourceHandle);
+        pResource->refcount += pNode->getRefCount();
+    }
+
+    /*
+     * compute first/last users for active passes
+     */
+    for (auto& pPassNode : mPassNodes) {
+        if (pPassNode->isCulled()) {
+            continue;
+        }
+
+        auto const& reads = dependencyGraph.getIncomingEdges(pPassNode.get());
+        for (auto const& edge : reads) {
+            auto const* node = static_cast<ResourceNode const*>(dependencyGraph.getNode(edge->from));
+            VirtualResource* const pResource = getResource(node->resourceHandle);
+            // figure out which is the first pass to need this resource
+            pResource->first = pResource->first ? pResource->first : pPassNode.get();
+            // figure out which is the last pass to need this resource
+            pResource->last = pPassNode.get();
+        }
+
+        auto const& writes = dependencyGraph.getOutgoingEdges(pPassNode.get());
+        for (auto const& edge : writes) {
+            auto const* node = static_cast<ResourceNode const*>(dependencyGraph.getNode(edge->to));
+            VirtualResource* const pResource = getResource(node->resourceHandle);
+            // figure out which is the first pass to need this resource
+            pResource->first = pResource->first ? pResource->first : pPassNode.get();
+            // figure out which is the last pass to need this resource
+            pResource->last = pPassNode.get();
+        }
+    }
+
+    // TODO: resolve usage bits
+
+    dependencyGraph.export_graphviz(utils::slog.d);
     return *this;
 }
 
 void FrameGraph::execute(backend::DriverApi& driver) noexcept {
-}
-
-void FrameGraph::present(FrameGraphHandle input) {
-    assert(isValid(input));
-
-//    struct Empty{};
-//    addPass<Empty>("Present",
-//            [&](Builder& builder, auto& data) {
-//                builder.read(input);
-//                builder.sideEffect();
-//            }, [](FrameGraphResources const& resources, auto const& data, backend::DriverApi&) {});
-
-    getResourceNode(input)->makeTarget();
+    auto const& passNodes = mPassNodes;
+    driver.pushGroupMarker("FrameGraph");
+    for (auto const& node : passNodes) {
+        if (!node->isCulled()) {
+            driver.pushGroupMarker(node->getName());
+            // TODO: devirtualize resources
+            // TODO: create declared render targets
+            // TODO: call execute
+            //FrameGraphResources resources(*this, node);
+            //node->execute(resources, driver);
+            // TODO: destroy declared render targets
+            // TODO: destroy resources
+            driver.popGroupMarker();
+        }
+    }
+    // this is a good place to kick the GPU, since we've just done a bunch of work
+    driver.flush();
+    driver.popGroupMarker();
+    // TODO: reset the graph
+    //reset();
 }
 
 FrameGraphId<Texture> FrameGraph::import(char const* name, Texture::Descriptor const& desc,
@@ -69,9 +122,17 @@ FrameGraphId<Texture> FrameGraph::import(char const* name, Texture::Descriptor c
     return FrameGraphId<Texture>();
 }
 
+void FrameGraph::addPresentPass(std::function<void(FrameGraph::Builder&)> setup) noexcept {
+    PresentPassNode* node = new PresentPassNode(*this);
+    mPassNodes.emplace_back(node);
+    Builder builder(*this, *node);
+    setup(builder);
+    builder.sideEffect();
+}
+
 FrameGraph::Builder FrameGraph::addPassInternal(char const* name, PassExecutor* base) noexcept {
     // record in our pass list and create the builder
-    PassNode* node = new PassNode(*this, name, base);
+    PassNode* node = new RenderPassNode(*this, name, base);
     mPassNodes.emplace_back(node);
     return Builder(*this, *node);
 }

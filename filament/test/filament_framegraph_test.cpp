@@ -610,3 +610,80 @@ TEST(FrameGraph2Test, Simple) {
 
     fg.compile();
 }
+
+TEST(FrameGraph2Test, Complexe) {
+    using namespace fg2;
+    MockResourceAllocator resourceAllocator;
+    fg2::FrameGraph fg(resourceAllocator);
+
+    struct DepthPassData {
+        fg2::FrameGraphId<Texture> depth;
+    };
+    auto& depthPass = fg.addPass<DepthPassData>("Depth pass",
+            [&](fg2::FrameGraph::Builder& builder, auto& data) {
+                data.depth = builder.create<Texture>("Depth Buffer", {.width=16, .height=32});
+                data.depth = builder.write(data.depth, Texture::Usage::DEPTH_ATTACHMENT);
+            },
+            [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
+            });
+
+    struct GBufferPassData {
+        fg2::FrameGraphId<Texture> depth;
+        fg2::FrameGraphId<Texture> gbuf1;
+        fg2::FrameGraphId<Texture> gbuf2;
+        fg2::FrameGraphId<Texture> gbuf3;
+    };
+    auto& gBufferPass = fg.addPass<GBufferPassData>("Gbuffer pass",
+            [&](fg2::FrameGraph::Builder& builder, auto& data) {
+                data.depth = builder.read(depthPass->depth, Texture::Usage::DEPTH_ATTACHMENT);
+                Texture::Descriptor desc = builder.getDescriptor(data.depth);
+                data.gbuf1 = builder.create<Texture>("Gbuffer 1", desc);
+                data.gbuf2 = builder.create<Texture>("Gbuffer 2", desc);
+                data.gbuf3 = builder.create<Texture>("Gbuffer 3", desc);
+
+                data.depth = builder.write(data.depth, Texture::Usage::DEPTH_ATTACHMENT);
+                data.gbuf1 = builder.write(data.gbuf1, Texture::Usage::COLOR_ATTACHMENT);
+                data.gbuf2 = builder.write(data.gbuf2, Texture::Usage::COLOR_ATTACHMENT);
+                data.gbuf3 = builder.write(data.gbuf3, Texture::Usage::COLOR_ATTACHMENT);
+            },
+            [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
+            });
+
+    struct LightingPassData {
+        fg2::FrameGraphId<Texture> lightingBuffer;
+        fg2::FrameGraphId<Texture> depth;
+        fg2::FrameGraphId<Texture> gbuf1;
+        fg2::FrameGraphId<Texture> gbuf2;
+        fg2::FrameGraphId<Texture> gbuf3;
+    };
+    auto& lightingPass = fg.addPass<LightingPassData>("Lighting pass",
+            [&](fg2::FrameGraph::Builder& builder, auto& data) {
+                data.depth = builder.read(gBufferPass->depth, Texture::Usage::SAMPLEABLE);
+                data.gbuf1 = builder.read(gBufferPass->gbuf1, Texture::Usage::SAMPLEABLE);
+                data.gbuf2 = builder.read(gBufferPass->gbuf2, Texture::Usage::SAMPLEABLE);
+                data.gbuf3 = builder.read(gBufferPass->gbuf3, Texture::Usage::SAMPLEABLE);
+                Texture::Descriptor desc = builder.getDescriptor(data.depth);
+                data.lightingBuffer = builder.create<Texture>("Lighting buffer", desc);
+                data.lightingBuffer = builder.write(data.lightingBuffer, Texture::Usage::COLOR_ATTACHMENT);
+            },
+            [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
+            });
+
+    struct PostPassData {
+        fg2::FrameGraphId<Texture> lightingBuffer;
+        fg2::FrameGraphId<Texture> backBuffer;
+    };
+    auto& postPass = fg.addPass<PostPassData>("Lighting pass",
+            [&](fg2::FrameGraph::Builder& builder, auto& data) {
+                data.lightingBuffer = builder.read(lightingPass->lightingBuffer, Texture::Usage::SAMPLEABLE);
+                Texture::Descriptor desc = builder.getDescriptor(data.lightingBuffer);
+                data.backBuffer = builder.create<Texture>("Backbuffer", desc);
+                data.backBuffer = builder.write(data.backBuffer, Texture::Usage::COLOR_ATTACHMENT);
+            },
+            [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
+            });
+
+    fg.present(postPass->backBuffer);
+
+    fg.compile();
+}

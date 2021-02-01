@@ -44,6 +44,7 @@ public:
     FrameGraphHandle::Version version = 0;
 
     // computed during compile()
+    uint32_t refcount = 0;
     PassNode* first = nullptr;  // pass that needs to instantiate the resource
     PassNode* last = nullptr;   // pass that can destroy the resource
 

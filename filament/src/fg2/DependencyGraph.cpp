@@ -137,39 +137,38 @@ void DependencyGraph::export_graphviz(utils::io::ostream& out, char const* name)
 
     for (Node const* node : nodes) {
         uint32_t id = node->getId();
-        const char* const nodeName = node->getName();
-        uint32_t refCount = node->getRefCount();
-
-        out << "\"N" << id << "\" [label=\"" << nodeName
-            << "\\nrefs: " << refCount
-            << "\\nseq: " << id
-            << "\", style=filled, fillcolor="
-            << (refCount ? "darkorange" : "darkorange4") << "]\n";
+        utils::CString s = node->graphvizify();
+        out << "\"N" << id << "\" " << s.c_str() << "\n";
     }
 
     out << "\n";
     for (Node const* node : nodes) {
         uint32_t id = node->getId();
 
+        auto edges = getOutgoingEdges(node);
+        auto first = edges.begin();
+        auto pos = std::partition(first, edges.end(),
+                [this](auto const& edge) { return isEdgeValid(edge); });
+
         // render the valid edges
-        out << "N" << id << " -> { ";
-        for (Edge const* edge : getOutgoingEdges(node)) {
-            if (isEdgeValid(edge)) {
-                Node const* ref = getNode(edge->to);
+        if (first != pos) {
+            out << "N" << id << " -> { ";
+            while (first != pos) {
+                Node const* ref = getNode((*first++)->to);
                 out << "N" << ref->getId() << " ";
             }
+            out << "} [color=red2]\n";
         }
-        out << "} [color=red2]\n";
 
         // render the invalid edges
-        out << "N" << id << " -> { ";
-        for (Edge const* edge : getOutgoingEdges(node)) {
-            if (!isEdgeValid(edge)) {
-                Node const* ref = getNode(edge->to);
+        if (first != edges.end()) {
+            out << "N" << id << " -> { ";
+            while (first != pos) {
+                Node const* ref = getNode((*first++)->to);
                 out << "N" << ref->getId() << " ";
             }
+            out << "} [color=red4 style=dashed]\n";
         }
-        out << "} [color=red4 style=dashed]\n";
     }
 
     out << "}" << utils::io::endl;
@@ -203,6 +202,17 @@ void DependencyGraph::Node::makeTarget() noexcept {
 
 bool DependencyGraph::Node::isTarget() const noexcept {
     return mRefCount >= TARGET;
+}
+
+char const* DependencyGraph::Node::getName() const {
+    return "unknown";
+}
+
+void DependencyGraph::Node::onCulled(DependencyGraph* graph) {
+}
+
+utils::CString DependencyGraph::Node::graphvizify() const {
+    return utils::CString{};
 }
 
 } // namespace filament::fg2

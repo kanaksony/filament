@@ -32,6 +32,8 @@
 #include <backend/DriverEnums.h>
 #include <backend/Handle.h>
 
+#include <functional>
+
 namespace filament {
 
 class ResourceAllocatorInterface;
@@ -247,8 +249,8 @@ public:
      *
      * @param input a resource handle
      */
-    void present(FrameGraphHandle input);
-
+    template<typename RESOURCE>
+    void present(FrameGraphId<RESOURCE> input);
 
     /**
      * Imports a concrete resource to the frame graph. The lifetime management is not transferred
@@ -289,6 +291,7 @@ private:
         int16_t nid;    // ResourceNode* index
     };
 
+    void addPresentPass(std::function<void(Builder&)> setup) noexcept;
     Builder addPassInternal(const char* name, PassExecutor* base) noexcept;
     FrameGraphHandle addResourceInternal(VirtualResource* resource) noexcept;
     FrameGraphHandle readInternal(FrameGraphHandle handle, ResourceNode** pNode, VirtualResource** pResource) noexcept;
@@ -357,6 +360,11 @@ Pass<Data, Execute>& FrameGraph::addPass(char const* name, Setup setup, Execute&
 // -----------------------------------------------------------------------------------------------
 
 template<typename RESOURCE>
+void FrameGraph::present(FrameGraphId<RESOURCE> input) {
+    addPresentPass([&](Builder& builder) { builder.read(input); });
+}
+
+template<typename RESOURCE>
 FrameGraphId<RESOURCE> FrameGraph::Builder::create(char const* name,
         typename RESOURCE::Descriptor const& desc) noexcept {
     VirtualResource* resource = new Resource<RESOURCE>(name, desc, mFrameGraph.mResources.size());
@@ -392,7 +400,7 @@ FrameGraphId<RESOURCE> FrameGraph::Builder::write(
 template<typename RESOURCE>
 typename RESOURCE::Descriptor const& FrameGraph::Builder::getDescriptor(
         FrameGraphId<RESOURCE> handle) const {
-    return static_cast<RESOURCE const*>(mFrameGraph.getResource(handle))->descriptor;
+    return static_cast<Resource<RESOURCE> const*>(mFrameGraph.getResource(handle))->descriptor;
 }
 
 

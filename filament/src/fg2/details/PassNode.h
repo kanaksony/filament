@@ -19,23 +19,35 @@
 
 #include "fg2/details/DependencyGraph.h"
 #include "fg2/details/Utilities.h"
+#include "private/backend/DriverApiForward.h"
+
+namespace utils {
+class CString;
+} // namespace utils
 
 namespace filament::fg2 {
 
 class FrameGraph;
+class FrameGraphResources;
 class PassExecutor;
 
 class PassNode : public DependencyGraph::Node {
 public:
-    PassNode(FrameGraph& fg, const char* name, PassExecutor* base) noexcept;
+    using DependencyGraph::Node::Node;
     PassNode(PassNode&& rhs) noexcept;
-    ~PassNode() override;
-
     PassNode(PassNode const&) = delete;
     PassNode& operator=(PassNode const&) = delete;
-    PassNode& operator=(PassNode&&) = delete;
-
+    ~PassNode() noexcept override;
     using NodeID = DependencyGraph::NodeID;
+
+    virtual void execute(FrameGraphResources const& resources, backend::DriverApi& driver) noexcept = 0;
+};
+
+class RenderPassNode : public PassNode {
+public:
+    RenderPassNode(FrameGraph& fg, const char* name, PassExecutor* base) noexcept;
+    RenderPassNode(RenderPassNode&& rhs) noexcept;
+    ~RenderPassNode() noexcept override;
 
     // constants
     const char* const name = nullptr;                   // our name
@@ -45,6 +57,23 @@ private:
     // virtuals from DependencyGraph::Node
     char const* getName() const override { return name; }
     void onCulled(DependencyGraph* graph) override;
+    utils::CString graphvizify() const override;
+    void execute(FrameGraphResources const& resources, backend::DriverApi& driver) noexcept override;
+};
+
+class PresentPassNode : public PassNode {
+public:
+    PresentPassNode(FrameGraph& fg) noexcept;
+    PresentPassNode(PresentPassNode&& rhs) noexcept;
+    ~PresentPassNode() noexcept override;
+    PresentPassNode(PresentPassNode const&) = delete;
+    PresentPassNode& operator=(PresentPassNode const&) = delete;
+    void execute(FrameGraphResources const& resources, backend::DriverApi& driver) noexcept override;
+private:
+    // virtuals from DependencyGraph::Node
+    char const* getName() const override;
+    void onCulled(DependencyGraph* graph) override;
+    utils::CString graphvizify() const override;
 };
 
 } // namespace filament::fg2

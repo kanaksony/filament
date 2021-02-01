@@ -20,6 +20,7 @@
 #include <utils/ostream.h>
 
 #include <vector>
+#include <utils/CString.h>
 
 namespace filament::fg2 {
 
@@ -37,7 +38,7 @@ public:
     class Node;
 
     /**
-     * A link between two nodes
+     * A link between two nodes.
      */
     class Edge {
     public:
@@ -58,7 +59,7 @@ public:
 
         // Edge can't be copied or moved
         Edge(Edge const& rhs) noexcept = delete;
-        Edge& operator=(Edge&& rhs) noexcept = delete;
+        Edge& operator=(Edge const& rhs) noexcept = delete;
     };
 
     /**
@@ -76,7 +77,6 @@ public:
         // Nodes can't be copied
         Node(Node const&) noexcept = delete;
         Node& operator=(Node const&) noexcept = delete;
-        Node& operator=(Node&&) noexcept = delete;
 
         //! Nodes can be moved
         Node(Node&&) noexcept = default;
@@ -108,10 +108,13 @@ public:
 
     public:
         //! return the name of this node
-        virtual char const* getName() const = 0;
+        virtual char const* getName() const;
 
         //! called from DependencyGraph::cull() when a node a culled
-        virtual void onCulled(DependencyGraph* graph) { }
+        virtual void onCulled(DependencyGraph* graph);
+
+        //! output itself as a graphviz string
+        virtual utils::CString graphvizify() const;
 
     private:
         // nodes that read from us: i.e. we have a reference to them

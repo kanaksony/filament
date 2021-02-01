@@ -20,6 +20,10 @@
 #include "fg2/details/DependencyGraph.h"
 #include "fg2/details/Utilities.h"
 
+namespace utils {
+class CString;
+} // namespace utils
+
 namespace filament::fg2 {
 
 class FrameGraph;
@@ -46,7 +50,9 @@ private:
     // virtuals from DependencyGraph::Node
     char const* getName() const override;
     void onCulled(DependencyGraph* graph) override;
+    utils::CString graphvizify() const override;
 
+private:
     FrameGraph& mFrameGraph;
     std::vector<DependencyGraph::Edge *> mReaders;
     DependencyGraph::Edge* mWriter = nullptr;

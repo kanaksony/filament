@@ -27,7 +27,11 @@ namespace filament::fg2 {
 
 class PassExecutor {
     friend class FrameGraph;
+    friend class RenderPassNode;
+
+protected:
     virtual void execute(FrameGraphResources const& resources, backend::DriverApi& driver) noexcept = 0;
+
 public:
     PassExecutor();
     virtual ~PassExecutor();
@@ -57,6 +61,8 @@ class Pass : private PassExecutor {
 public:
     Data const& getData() const noexcept { return mData; }
     Data& getData() noexcept { return mData; }
+    Data const* operator->() const { return &getData(); }
+    Data* operator->() { return &getData(); }
 };
 
 } // namespace filament::fg2

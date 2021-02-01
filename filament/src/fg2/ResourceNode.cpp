@@ -48,4 +48,32 @@ void ResourceNode::setIncomingEdge(DependencyGraph::Edge* edge) noexcept {
     assert(mWriter == nullptr);
     mWriter = edge;
 }
+
+utils::CString ResourceNode::graphvizify() const {
+    std::string s;
+
+    uint32_t id = getId();
+    const char* const nodeName = getName();
+    uint32_t refCount = getRefCount();
+    VirtualResource* const pResource = mFrameGraph.getResource(resourceHandle);
+
+    s.append("[label=\"");
+    s.append(nodeName);
+    s.append("\\nrefs: ");
+    s.append(std::to_string(pResource->refcount));
+    s.append(", id: ");
+    s.append(std::to_string(id));
+    s.append("\\nversion: ");
+    s.append(std::to_string(pResource->version));
+    if (pResource->imported) {
+        s.append(", imported");
+    }
+    s.append("\", ");
+
+    s.append("style=filled, fillcolor=");
+    s.append(refCount ? "skyblue" : "skyblue4");
+    s.append("]");
+
+    return utils::CString{ s.c_str() };
+}
 } // namespace filament::fg2
