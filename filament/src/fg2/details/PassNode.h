@@ -19,6 +19,8 @@
 
 #include "fg2/details/DependencyGraph.h"
 #include "fg2/details/Utilities.h"
+#include "fg2/FrameGraph.h"
+#include "fg2/RenderTarget.h"
 #include "private/backend/DriverApiForward.h"
 
 namespace utils {
@@ -30,6 +32,7 @@ namespace filament::fg2 {
 class FrameGraph;
 class FrameGraphResources;
 class PassExecutor;
+class ResourceNode;
 
 class PassNode : public DependencyGraph::Node {
 public:
@@ -49,6 +52,9 @@ public:
     RenderPassNode(RenderPassNode&& rhs) noexcept;
     ~RenderPassNode() noexcept override;
 
+    RenderTarget declareRenderTarget(FrameGraph& fg, FrameGraph::Builder& builder,
+            RenderTarget::Descriptor const& descriptor) noexcept;
+
     // constants
     const char* const name = nullptr;                   // our name
     UniquePtr<PassExecutor, LinearAllocatorArena> base; // type eraser for calling execute()
@@ -59,6 +65,16 @@ private:
     void onCulled(DependencyGraph* graph) override;
     utils::CString graphvizify() const override;
     void execute(FrameGraphResources const& resources, backend::DriverApi& driver) noexcept override;
+
+    struct RenderTargetData {
+        RenderTarget::Descriptor descriptor;
+        ResourceNode* incoming[6] = {};  // nodes of the incoming attachments
+        ResourceNode* outgoing[6] = {};  // nodes of the outgoing attachments
+        backend::Handle<backend::HwRenderTarget> target;
+        backend::RenderPassParams params;
+    };
+
+    std::vector<RenderTargetData> mRenderTargetData;
 };
 
 class PresentPassNode : public PassNode {

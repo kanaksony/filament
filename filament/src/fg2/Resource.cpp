@@ -15,6 +15,8 @@
  */
 
 #include "fg2/details/Resource.h"
+
+#include "fg2/details/PassNode.h"
 #include "fg2/details/ResourceNode.h"
 
 namespace filament::fg2 {
@@ -27,6 +29,18 @@ void VirtualResource::addOutgoingEdge(ResourceNode* node, DependencyGraph::Edge*
 
 void VirtualResource::setIncomingEdge(ResourceNode* node, DependencyGraph::Edge* edge) noexcept {
     node->setIncomingEdge(edge);
+}
+
+DependencyGraph::Node* VirtualResource::toDependencyGraphNode(ResourceNode* node) noexcept {
+    // this can't go to the header file, because it would add a dependency on ResourceNode.h,
+    // which we prefer to avoid
+    return node;
+}
+
+DependencyGraph::Node* VirtualResource::toDependencyGraphNode(PassNode* node) noexcept {
+    // this can't go to the header file, because it would add a dependency on PassNode.h
+    // which we prefer to avoid
+    return node;
 }
 
 } // namespace filament::fg2

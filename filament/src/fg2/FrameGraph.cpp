@@ -33,8 +33,28 @@ FrameGraph::Builder::Builder(FrameGraph& fg, PassNode& pass) noexcept
 FrameGraph::Builder::~Builder() noexcept = default;
 
 void FrameGraph::Builder::sideEffect() noexcept {
-    // TODO: could be interesting to implement this by adding a "side effect" node
     mPass.makeTarget();
+}
+
+RenderTarget FrameGraph::Builder::useAsRenderTarget(RenderTarget::Descriptor const& desc) noexcept {
+    // it's safe here to cast to RenderPassNode because we can't be here for a PresentPassNode
+    // also only RenderPassNodes have the concept of render targets.
+    return static_cast<RenderPassNode&>(mPass).declareRenderTarget(mFrameGraph, *this, desc);
+}
+
+uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>& color) noexcept {
+    auto[attachments, id] = useAsRenderTarget({ .attachments = { .color = { color }}});
+    color = attachments.color[0];
+    return id;
+}
+
+uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>& color,
+        FrameGraphId<Texture>& depth) noexcept {
+    auto[attachments, id] = useAsRenderTarget({
+            .attachments = { .color = { color }, .depth = depth }});
+    color = attachments.color[0];
+    depth = attachments.depth;
+    return id;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -57,15 +77,12 @@ FrameGraph& FrameGraph::compile() noexcept {
     for (auto& pNode : mResourceNodes) {
         VirtualResource* pResource = getResource(pNode->resourceHandle);
         pResource->refcount += pNode->getRefCount();
-        if (!pNode->isCulled()) {
-            assert(pResource->refcount);
 
-            // Resolve Usage bits
-            auto const& outgoing = pNode->getOutgoingEdges();
-            pResource->resolveUsage(dependencyGraph, outgoing.data(), outgoing.size());
-            auto const& incoming = pNode->getIncomingEdges(); // there is always only one writer/node
-            pResource->resolveUsage(dependencyGraph, incoming.data(), incoming.size());
-        }
+        // Resolve Usage bits
+        auto const& outgoing = pNode->getOutgoingEdges();
+        pResource->resolveUsage(dependencyGraph, outgoing.data(), outgoing.size());
+        auto const& incoming = pNode->getIncomingEdges(); // there is always only one writer/node
+        pResource->resolveUsage(dependencyGraph, incoming.data(), incoming.size());
     }
 
     /*

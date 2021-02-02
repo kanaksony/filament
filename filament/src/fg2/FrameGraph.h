@@ -56,12 +56,14 @@ public:
         /**
          * Declare a RenderTarget for this pass. All subresource handles get new versions after
          * this call. The new values are available in the returned RenderTarget.
+         * useAsRenderTarget() implies a write(). If a read() is also needed, it must be
+         * issued separately before calling useAsRenderTarget().
          *
          * @param desc descriptor for the render target
          * @return a RenderTarget structure containing the new subresource handles as well as an
          *         id to retrieve the concrete render target in the execute phase.
          */
-        RenderTarget useAsRenderTarget(RenderTarget::Descriptor const& desc);
+        RenderTarget useAsRenderTarget(RenderTarget::Descriptor const& desc) noexcept;
 
         /**
          * Helper to easily declare a render target with a single color attachment.
@@ -75,7 +77,7 @@ public:
          * @param color color attachment subresource
          * @return the id of this Render Target
          */
-        uint32_t useAsRenderTarget(FrameGraphId<Texture>& color);
+        uint32_t useAsRenderTarget(FrameGraphId<Texture>& color) noexcept;
 
         /**
          * Helper to easily declare a render target with a color and depth attachment.
@@ -89,7 +91,7 @@ public:
          * @param color color attachment subresource
          * @return the id of this Render Target
          */
-        uint32_t useAsRenderTarget(FrameGraphId<Texture>& color, FrameGraphId<Texture>& depth);
+        uint32_t useAsRenderTarget(FrameGraphId<Texture>& color, FrameGraphId<Texture>& depth) noexcept;
 
 
         /**
@@ -284,8 +286,9 @@ public:
     DependencyGraph& getGraph() noexcept { return mGraph; }
 
 private:
-    friend class ResourceNode;
     friend class FrameGraphResources;
+    friend class ResourceNode;
+    friend class RenderPassNode;
 
     struct ResourceSlot {
         int16_t rid;    // VirtualResource* index

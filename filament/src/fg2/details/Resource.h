@@ -19,18 +19,15 @@
 
 #include "fg2/FrameGraphId.h"
 #include "fg2/details/DependencyGraph.h"
-#include "fg2/details/PassNode.h"
-#include "fg2/details/ResourceNode.h"
-
-#include <utils/CString.h>
-
-#include <vector>
 
 namespace filament {
 class ResourceAllocatorInterface;
 } // namespace::filament
 
 namespace filament::fg2 {
+
+class PassNode;
+class ResourceNode;
 
 /*
  * The generic parts of virtual resources.
@@ -76,6 +73,9 @@ public:
 protected:
     void addOutgoingEdge(ResourceNode* node, DependencyGraph::Edge* edge) noexcept;
     void setIncomingEdge(ResourceNode* node, DependencyGraph::Edge* edge) noexcept;
+    // these exist only so we don't have to include PassNode.h or ResourceNode.h
+    static DependencyGraph::Node* toDependencyGraphNode(ResourceNode* node) noexcept;
+    static DependencyGraph::Node* toDependencyGraphNode(PassNode* node) noexcept;
 };
 
 // ------------------------------------------------------------------------------------------------
@@ -120,14 +120,16 @@ public:
     // pass Node to resource Node edge (a write to)
     void connect(DependencyGraph& graph,
             PassNode* passNode, ResourceNode* resourceNode, Usage u) noexcept {
-        auto* edge = new ResourceEdge(graph, passNode, resourceNode, u);
+        auto* edge = new ResourceEdge(graph,
+                toDependencyGraphNode(passNode), toDependencyGraphNode(resourceNode), u);
         setIncomingEdge(resourceNode, edge);
     }
 
     // resource Node to pass Node edge (a read from)
     void connect(DependencyGraph& graph,
             ResourceNode* resourceNode, PassNode* passNode, Usage u) noexcept {
-        auto* edge = new ResourceEdge(graph, resourceNode, passNode, u);
+        auto* edge = new ResourceEdge(graph,
+                toDependencyGraphNode(resourceNode), toDependencyGraphNode(passNode), u);
         addOutgoingEdge(resourceNode, edge);
     }
 

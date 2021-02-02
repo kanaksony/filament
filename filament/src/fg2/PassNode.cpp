@@ -62,6 +62,41 @@ void RenderPassNode::execute(
     base->execute(resources, driver);
 }
 
+RenderTarget RenderPassNode::declareRenderTarget(FrameGraph& fg, FrameGraph::Builder& builder,
+        RenderTarget::Descriptor const& descriptor) noexcept {
+
+    RenderTargetData data;
+    data.descriptor = descriptor;
+    RenderTarget::Attachments& attachments = data.descriptor.attachments;
+
+    // retrieve the ResourceNode of the attachments coming to us -- this will be used later
+    // to compute the discard flags.
+    for (size_t i = 0; i < 4; i++) {
+        if (descriptor.attachments.color[i].isValid()) {
+            data.incoming[i] = fg.getResourceNode(attachments.color[i]);
+            attachments.color[i] = builder.write(attachments.color[i],
+                    Texture::Usage::COLOR_ATTACHMENT);
+            data.outgoing[i] = fg.getResourceNode(attachments.color[i]);
+        }
+    }
+    if (descriptor.attachments.depth.isValid()) {
+        data.incoming[4] = fg.getResourceNode(attachments.depth);
+        attachments.depth = builder.write(attachments.depth,
+                Texture::Usage::DEPTH_ATTACHMENT);
+        data.outgoing[4] = fg.getResourceNode(attachments.depth);
+    }
+    if (descriptor.attachments.stencil.isValid()) {
+        data.incoming[5] = fg.getResourceNode(attachments.stencil);
+        attachments.stencil = builder.write(attachments.stencil,
+                Texture::Usage::STENCIL_ATTACHMENT);
+        data.outgoing[5] = fg.getResourceNode(attachments.stencil);
+    }
+
+    uint32_t id = mRenderTargetData.size();
+    mRenderTargetData.push_back(data);
+    return { data.descriptor.attachments, id };
+}
+
 // ------------------------------------------------------------------------------------------------
 
 PresentPassNode::PresentPassNode(FrameGraph& fg) noexcept
