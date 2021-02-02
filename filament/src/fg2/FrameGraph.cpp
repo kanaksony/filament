@@ -57,6 +57,15 @@ FrameGraph& FrameGraph::compile() noexcept {
     for (auto& pNode : mResourceNodes) {
         VirtualResource* pResource = getResource(pNode->resourceHandle);
         pResource->refcount += pNode->getRefCount();
+        if (!pNode->isCulled()) {
+            assert(pResource->refcount);
+
+            // Resolve Usage bits
+            auto const& outgoing = pNode->getOutgoingEdges();
+            pResource->resolveUsage(dependencyGraph, outgoing.data(), outgoing.size());
+            auto const& incoming = pNode->getIncomingEdges(); // there is always only one writer/node
+            pResource->resolveUsage(dependencyGraph, incoming.data(), incoming.size());
+        }
     }
 
     /*
@@ -87,8 +96,6 @@ FrameGraph& FrameGraph::compile() noexcept {
             pResource->last = pPassNode.get();
         }
     }
-
-    // TODO: resolve usage bits
 
     dependencyGraph.export_graphviz(utils::slog.d);
     return *this;

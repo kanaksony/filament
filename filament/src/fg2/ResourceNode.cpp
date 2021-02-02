@@ -51,6 +51,7 @@ void ResourceNode::setIncomingEdge(DependencyGraph::Edge* edge) noexcept {
 
 utils::CString ResourceNode::graphvizify() const {
     std::string s;
+    s.reserve(128);
 
     uint32_t id = getId();
     const char* const nodeName = getName();
@@ -68,11 +69,14 @@ utils::CString ResourceNode::graphvizify() const {
     if (pResource->imported) {
         s.append(", imported");
     }
+    s.append("\\nusage: ");
+    s.append(pResource->usageString().c_str());
     s.append("\", ");
 
     s.append("style=filled, fillcolor=");
     s.append(refCount ? "skyblue" : "skyblue4");
     s.append("]");
+    s.shrink_to_fit();
 
     return utils::CString{ s.c_str() };
 }

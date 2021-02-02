@@ -46,6 +46,16 @@ public:
         return mWriter != nullptr;
     }
 
+    std::vector<DependencyGraph::Edge *> const& getOutgoingEdges() const {
+        return mReaders;
+    }
+
+    std::vector<DependencyGraph::Edge *> getIncomingEdges() const {
+        // okay, this is a bit overkill, but it makes the API simple & symmetric
+        if (!mWriter) { return {}; }
+        return { mWriter };
+    }
+
 private:
     // virtuals from DependencyGraph::Node
     char const* getName() const override;

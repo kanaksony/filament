@@ -22,6 +22,8 @@
 #include "fg2/details/PassNode.h"
 #include "fg2/details/ResourceNode.h"
 
+#include <utils/CString.h>
+
 #include <vector>
 
 namespace filament {
@@ -68,6 +70,8 @@ public:
 
     /** Destroy an Edge instantiated by this resource */
     virtual void destroyEdge(DependencyGraph::Edge* edge) noexcept = 0;
+
+    virtual utils::CString usageString() const noexcept = 0;
 
 protected:
     void addOutgoingEdge(ResourceNode* node, DependencyGraph::Edge* edge) noexcept;
@@ -154,6 +158,10 @@ private:
 
     void destroy(ResourceAllocatorInterface& resourceAllocator) noexcept override {
         resource.destroy(resourceAllocator);
+    }
+
+    utils::CString usageString() const noexcept override {
+        return utils::to_string(usage);
     }
 };
 

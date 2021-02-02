@@ -79,10 +79,12 @@ void PresentPassNode::onCulled(DependencyGraph* graph) {
 
 utils::CString PresentPassNode::graphvizify() const {
     std::string s;
+    s.reserve(128);
     uint32_t id = getId();
     s.append("[label=\"Present , id: ");
     s.append(std::to_string(id));
     s.append("\", style=filled, fillcolor=red3]");
+    s.shrink_to_fit();
     return utils::CString{ s.c_str() };
 }
 
