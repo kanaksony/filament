@@ -34,7 +34,7 @@ namespace filament::fg2 {
  *      struct SubResourceDescriptor;
  *      a Usage bitmask
  * And declares and define:
- *      void create(ResourceAllocatorInterface&, Descriptor const&, Usage) noexcept;
+ *      void create(ResourceAllocatorInterface&, const char* name, Descriptor const&, Usage) noexcept;
  *      void destroy(ResourceAllocatorInterface&) noexcept;
  */
 struct Texture {
@@ -65,18 +65,14 @@ struct Texture {
      * @param resourceAllocator resource allocator for textures and such
      * @param descriptor Descriptor to the resource
      */
-    void create(ResourceAllocatorInterface& resourceAllocator,
-            Descriptor const& descriptor, Usage usage) noexcept {
-        // TODO: implement in cpp file
-    }
+    void create(ResourceAllocatorInterface& resourceAllocator, const char* name,
+            Descriptor const& descriptor, Usage usage) noexcept;
 
     /**
      * Destroy the concrete resource
      * @param resourceAllocator
      */
-    void destroy(ResourceAllocatorInterface& resourceAllocator) noexcept {
-        // TODO: implement in cpp file
-    }
+    void destroy(ResourceAllocatorInterface& resourceAllocator) noexcept;
 };
 
 } // namespace filament::fg2

@@ -285,12 +285,14 @@ public:
 
 private:
     friend class ResourceNode;
+    friend class FrameGraphResources;
 
     struct ResourceSlot {
         int16_t rid;    // VirtualResource* index
         int16_t nid;    // ResourceNode* index
     };
 
+    void reset() noexcept;
     void addPresentPass(std::function<void(Builder&)> setup) noexcept;
     Builder addPassInternal(const char* name, PassExecutor* base) noexcept;
     FrameGraphHandle addResourceInternal(VirtualResource* resource) noexcept;

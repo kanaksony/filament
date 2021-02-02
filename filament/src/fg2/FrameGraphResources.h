@@ -17,15 +17,21 @@
 #ifndef TNT_FILAMENT_FG2_FRAMEGRAPHRESOURCES_H
 #define TNT_FILAMENT_FG2_FRAMEGRAPHRESOURCES_H
 
+#include "fg2/details/Resource.h"
 #include "fg2/FrameGraphId.h"
 
 namespace filament::fg2 {
+
+class FrameGraph;
+class PassNode;
+class VirtualResource;
 
 /**
  * Used to retrieve the concrete resources in the execute phase.
  */
 class FrameGraphResources {
 public:
+    FrameGraphResources(FrameGraph& fg, PassNode& passNode) noexcept;
     FrameGraphResources(FrameGraphResources const&) = delete;
     FrameGraphResources& operator=(FrameGraphResources const&) = delete;
 
@@ -42,7 +48,7 @@ public:
      * @return          Reference to the concrete resource
      */
     template<typename RESOURCE>
-    RESOURCE const& get(FrameGraphId<RESOURCE> handle) const noexcept;
+    inline RESOURCE const& get(FrameGraphId<RESOURCE> handle) const noexcept;
 
     /**
      * Retrieves the descriptor associated to a resource
@@ -51,8 +57,44 @@ public:
      * @return          Reference to the descriptor
      */
     template<typename RESOURCE>
-    typename RESOURCE::Descriptor const& getDescriptor(FrameGraphId<RESOURCE> handle) const;
+    inline typename RESOURCE::Descriptor const& getDescriptor(FrameGraphId<RESOURCE> handle) const noexcept;
+
+    /**
+     * Retrieves the usage associated to a resource
+     * @tparam RESOURCE Type of the resource
+     * @param handle    Handle to a virtual resource
+     * @return          Reference to the descriptor
+     */
+    template<typename RESOURCE>
+    inline typename RESOURCE::Usage const& getUsage(FrameGraphId<RESOURCE> handle) const noexcept;
+
+private:
+    VirtualResource const* getResource(FrameGraphHandle handle) const noexcept;
+    FrameGraph& mFrameGraph;
+    PassNode& mPassNode;
 };
+
+// ------------------------------------------------------------------------------------------------
+
+template<typename RESOURCE>
+RESOURCE const& FrameGraphResources::get(FrameGraphId<RESOURCE> handle) const noexcept {
+    // TODO: assert the resource exists and is devirtualized
+    return static_cast<Resource<RESOURCE> const*>(getResource(handle))->resource;
+}
+
+template<typename RESOURCE>
+typename RESOURCE::Descriptor const& FrameGraphResources::getDescriptor(
+        FrameGraphId<RESOURCE> handle) const noexcept {
+    // TODO: assert the resource exists and is devirtualized
+    return static_cast<Resource<RESOURCE> const*>(getResource(handle))->descriptor;
+}
+
+template<typename RESOURCE>
+typename RESOURCE::Usage const& FrameGraphResources::getUsage(
+        FrameGraphId<RESOURCE> handle) const noexcept {
+    // TODO: assert the resource exists and is devirtualized
+    return static_cast<Resource<RESOURCE> const*>(getResource(handle))->usage;
+}
 
 } // namespace filament::fg2
 

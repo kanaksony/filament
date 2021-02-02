@@ -87,13 +87,13 @@ template<typename RESOURCE>
 class Resource : public VirtualResource {
     using Usage = typename RESOURCE::Usage;
 
+public:
     // valid only after devirtualize() has been called
     RESOURCE resource{};
 
     // valid only after resolveUsage() has been called
     Usage usage{};
 
-public:
     using Descriptor = typename RESOURCE::Descriptor;
     using SubResourceDescriptor = typename RESOURCE::SubResourceDescriptor;
 
@@ -139,6 +139,11 @@ private:
     void resolveUsage(DependencyGraph& graph, DependencyGraph::Edge const* const* edges,
             size_t count) noexcept override {
         for (size_t i = 0; i < count; i++) {
+
+            // FIXME: even if a resource is culled because nobody reads from it
+            //        but a non-culled pass writes to it, that resource will need to be
+            //        devirtualized, so it's usage bits need to be calculated.
+
             if (graph.isEdgeValid(edges[i])) {
                 // this Edge is guaranteed to be a ResourceEdge<RESOURCE> by construction
                 ResourceEdge const* const edge = static_cast<ResourceEdge const*>(edges[i]);
@@ -153,7 +158,7 @@ private:
     }
 
     void devirtualize(ResourceAllocatorInterface& resourceAllocator) noexcept override {
-        resource.create(resourceAllocator, descriptor, usage);
+        resource.create(resourceAllocator, name, descriptor, usage);
     }
 
     void destroy(ResourceAllocatorInterface& resourceAllocator) noexcept override {

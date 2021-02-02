@@ -25,6 +25,7 @@
 #include "private/backend/CommandStream.h"
 
 #include "fg2/FrameGraph.h"
+#include "fg2/FrameGraphResources.h"
 #include "fg2/details/DependencyGraph.h"
 
 using namespace filament;
@@ -611,7 +612,7 @@ TEST(FrameGraph2Test, Simple) {
     fg.compile();
 }
 
-TEST(FrameGraph2Test, Complexe) {
+TEST_F(FrameGraphTest, FG2Complexe) {
     using namespace fg2;
     MockResourceAllocator resourceAllocator;
     fg2::FrameGraph fg(resourceAllocator);
@@ -624,7 +625,9 @@ TEST(FrameGraph2Test, Complexe) {
                 data.depth = builder.create<Texture>("Depth Buffer", {.width=16, .height=32});
                 data.depth = builder.write(data.depth, Texture::Usage::DEPTH_ATTACHMENT);
             },
-            [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
+            [=](fg2::FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
+                Texture const& depth = resources.get(data.depth);
+                EXPECT_TRUE((bool)depth.texture);
             });
 
     struct GBufferPassData {
@@ -647,6 +650,14 @@ TEST(FrameGraph2Test, Complexe) {
                 data.gbuf3 = builder.write(data.gbuf3, Texture::Usage::COLOR_ATTACHMENT);
             },
             [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
+                Texture const& depth = resources.get(data.depth);
+                Texture const& gbuf1 = resources.get(data.gbuf1);
+                Texture const& gbuf2 = resources.get(data.gbuf2);
+                Texture const& gbuf3 = resources.get(data.gbuf3);
+                EXPECT_TRUE((bool)depth.texture);
+                EXPECT_TRUE((bool)gbuf1.texture);
+                EXPECT_TRUE((bool)gbuf2.texture);
+                EXPECT_TRUE((bool)gbuf3.texture);
             });
 
     struct LightingPassData {
@@ -667,11 +678,27 @@ TEST(FrameGraph2Test, Complexe) {
                 data.lightingBuffer = builder.write(data.lightingBuffer, Texture::Usage::COLOR_ATTACHMENT);
             },
             [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
+                Texture const& lightingBuffer = resources.get(data.lightingBuffer);
+                Texture const& depth = resources.get(data.depth);
+                Texture const& gbuf1 = resources.get(data.gbuf1);
+                Texture const& gbuf2 = resources.get(data.gbuf2);
+                Texture const& gbuf3 = resources.get(data.gbuf3);
+                EXPECT_TRUE((bool)lightingBuffer.texture);
+                EXPECT_TRUE((bool)depth.texture);
+                EXPECT_TRUE((bool)gbuf1.texture);
+                EXPECT_TRUE((bool)gbuf2.texture);
+                EXPECT_TRUE((bool)gbuf3.texture);
             });
 
     struct PostPassData {
         fg2::FrameGraphId<Texture> lightingBuffer;
         fg2::FrameGraphId<Texture> backBuffer;
+        struct {
+            fg2::FrameGraphId<Texture> depth;
+            fg2::FrameGraphId<Texture> gbuf1;
+            fg2::FrameGraphId<Texture> gbuf2;
+            fg2::FrameGraphId<Texture> gbuf3;
+        } destroyed;
     };
     auto& postPass = fg.addPass<PostPassData>("Lighting pass",
             [&](fg2::FrameGraph::Builder& builder, auto& data) {
@@ -679,11 +706,33 @@ TEST(FrameGraph2Test, Complexe) {
                 Texture::Descriptor desc = builder.getDescriptor(data.lightingBuffer);
                 data.backBuffer = builder.create<Texture>("Backbuffer", desc);
                 data.backBuffer = builder.write(data.backBuffer, Texture::Usage::COLOR_ATTACHMENT);
+
+                data.destroyed.depth = lightingPass->depth;
+                data.destroyed.gbuf1 = lightingPass->gbuf1;
+                data.destroyed.gbuf2 = lightingPass->gbuf2;
+                data.destroyed.gbuf3 = lightingPass->gbuf3;
             },
             [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
+                Texture const& lightingBuffer = resources.get(data.lightingBuffer);
+                Texture const& backBuffer = resources.get(data.backBuffer);
+                EXPECT_TRUE((bool)lightingBuffer.texture);
+                EXPECT_TRUE((bool)backBuffer.texture);
+                EXPECT_FALSE((bool)resources.get(data.destroyed.depth).texture);
+                EXPECT_FALSE((bool)resources.get(data.destroyed.gbuf1).texture);
+                EXPECT_FALSE((bool)resources.get(data.destroyed.gbuf2).texture);
+                EXPECT_FALSE((bool)resources.get(data.destroyed.gbuf3).texture);
+
+                EXPECT_EQ(resources.getUsage(data.lightingBuffer),  Texture::Usage::SAMPLEABLE | Texture::Usage::COLOR_ATTACHMENT);
+                EXPECT_EQ(resources.getUsage(data.backBuffer),                                   Texture::Usage::COLOR_ATTACHMENT);
+                EXPECT_EQ(resources.getUsage(data.destroyed.depth), Texture::Usage::SAMPLEABLE | Texture::Usage::DEPTH_ATTACHMENT);
+                EXPECT_EQ(resources.getUsage(data.destroyed.gbuf1), Texture::Usage::SAMPLEABLE | Texture::Usage::COLOR_ATTACHMENT);
+                EXPECT_EQ(resources.getUsage(data.destroyed.gbuf2), Texture::Usage::SAMPLEABLE | Texture::Usage::COLOR_ATTACHMENT);
+                EXPECT_EQ(resources.getUsage(data.destroyed.gbuf3), Texture::Usage::SAMPLEABLE | Texture::Usage::COLOR_ATTACHMENT);
             });
 
     fg.present(postPass->backBuffer);
 
     fg.compile();
+
+    fg.execute(driverApi);
 }

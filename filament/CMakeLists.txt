@@ -93,9 +93,11 @@ set(SRCS
         src/fg/fg/ResourceEntry.cpp
         src/fg2/DependencyGraph.cpp
         src/fg2/FrameGraph.cpp
+        src/fg2/FrameGraphResources.cpp
         src/fg2/Pass.cpp
         src/fg2/PassNode.cpp
         src/fg2/ResourceNode.cpp
+        src/fg2/Texture.cpp
 )
 
 set(PRIVATE_HDRS

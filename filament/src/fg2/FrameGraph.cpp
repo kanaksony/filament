@@ -78,22 +78,36 @@ FrameGraph& FrameGraph::compile() noexcept {
 
         auto const& reads = dependencyGraph.getIncomingEdges(pPassNode.get());
         for (auto const& edge : reads) {
-            auto const* node = static_cast<ResourceNode const*>(dependencyGraph.getNode(edge->from));
-            VirtualResource* const pResource = getResource(node->resourceHandle);
-            // figure out which is the first pass to need this resource
-            pResource->first = pResource->first ? pResource->first : pPassNode.get();
-            // figure out which is the last pass to need this resource
-            pResource->last = pPassNode.get();
+
+            // FIXME: even if a resource is culled because nobody reads from it
+            //        but a non-culled pass writes to it, that resource will need to be
+            //        devirtualized
+
+            if (dependencyGraph.isEdgeValid(edge)) {
+                auto const* node = static_cast<ResourceNode const*>(dependencyGraph.getNode(edge->from));
+                VirtualResource* const pResource = getResource(node->resourceHandle);
+                // figure out which is the first pass to need this resource
+                pResource->first = pResource->first ? pResource->first : pPassNode.get();
+                // figure out which is the last pass to need this resource
+                pResource->last = pPassNode.get();
+            }
         }
 
         auto const& writes = dependencyGraph.getOutgoingEdges(pPassNode.get());
         for (auto const& edge : writes) {
-            auto const* node = static_cast<ResourceNode const*>(dependencyGraph.getNode(edge->to));
-            VirtualResource* const pResource = getResource(node->resourceHandle);
-            // figure out which is the first pass to need this resource
-            pResource->first = pResource->first ? pResource->first : pPassNode.get();
-            // figure out which is the last pass to need this resource
-            pResource->last = pPassNode.get();
+
+            // FIXME: even if a resource is culled because nobody reads from it
+            //        but a non-culled pass writes to it, that resource will need to be
+            //        devirtualized
+
+            if (dependencyGraph.isEdgeValid(edge)) {
+                auto const* node = static_cast<ResourceNode const*>(dependencyGraph.getNode(edge->to));
+                VirtualResource* const pResource = getResource(node->resourceHandle);
+                // figure out which is the first pass to need this resource
+                pResource->first = pResource->first ? pResource->first : pPassNode.get();
+                // figure out which is the last pass to need this resource
+                pResource->last = pPassNode.get();
+            }
         }
     }
 
@@ -103,25 +117,43 @@ FrameGraph& FrameGraph::compile() noexcept {
 
 void FrameGraph::execute(backend::DriverApi& driver) noexcept {
     auto const& passNodes = mPassNodes;
+    auto const& resourcesList = mResources;
+    auto& resourceAllocator = mResourceAllocator;
+
     driver.pushGroupMarker("FrameGraph");
     for (auto const& node : passNodes) {
         if (!node->isCulled()) {
             driver.pushGroupMarker(node->getName());
-            // TODO: devirtualize resources
+
+            // devirtualize resourcesList
+            for (auto& pResource : resourcesList) {
+                if (pResource->first == node.get()) {
+                    pResource->devirtualize(resourceAllocator);
+                }
+            }
+
             // TODO: create declared render targets
-            // TODO: call execute
-            //FrameGraphResources resources(*this, node);
-            //node->execute(resources, driver);
+
+            // call execute
+            FrameGraphResources resources(*this, *node);
+            node->execute(resources, driver);
+
             // TODO: destroy declared render targets
-            // TODO: destroy resources
+
+            // destroy resourcesList
+            for (auto& pResource : resourcesList) {
+                if (pResource->last == node.get()) {
+                    pResource->destroy(resourceAllocator);
+                }
+            }
+
             driver.popGroupMarker();
         }
     }
     // this is a good place to kick the GPU, since we've just done a bunch of work
     driver.flush();
     driver.popGroupMarker();
-    // TODO: reset the graph
-    //reset();
+    reset();
 }
 
 FrameGraphId<Texture> FrameGraph::import(char const* name, Texture::Descriptor const& desc,
@@ -202,6 +234,14 @@ FrameGraphHandle FrameGraph::writeInternal(FrameGraphHandle handle,
     (*pResource)->version = handle.version;
 
     return handle;
+}
+
+void FrameGraph::reset() noexcept {
+    // the order of destruction is important here
+    mPassNodes.clear();
+    mResourceNodes.clear();
+    mResources.clear();
+    mResourceSlots.clear();
 }
 
 } // namespace filament::fg2
