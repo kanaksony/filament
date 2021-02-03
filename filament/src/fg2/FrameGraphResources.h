@@ -20,11 +20,15 @@
 #include "fg2/details/Resource.h"
 #include "fg2/FrameGraphId.h"
 
+#include "backend/DriverEnums.h"
+#include "backend/Handle.h"
+
 namespace filament::fg2 {
 
 class FrameGraph;
 class PassNode;
 class VirtualResource;
+struct RenderTarget;
 
 /**
  * Used to retrieve the concrete resources in the execute phase.
@@ -34,6 +38,11 @@ public:
     FrameGraphResources(FrameGraph& fg, PassNode& passNode) noexcept;
     FrameGraphResources(FrameGraphResources const&) = delete;
     FrameGraphResources& operator=(FrameGraphResources const&) = delete;
+
+    struct RenderPassInfo {
+        backend::Handle<backend::HwRenderTarget> target;
+        backend::RenderPassParams params;
+    };
 
     /**
      * Return the name of the pass being executed
@@ -67,6 +76,14 @@ public:
      */
     template<typename RESOURCE>
     inline typename RESOURCE::Usage const& getUsage(FrameGraphId<RESOURCE> handle) const noexcept;
+
+    /**
+     * Retrieves the render pass information associated with Builder::userRenderTarget() with the
+     * give id.
+     * @param id identifier returned by Builder::userRenderTarget()
+     * @return RenderPassInfo structure suitable for creating a render pass
+     */
+    RenderPassInfo getRenderPassInfo(uint32_t id = 0u) const noexcept;
 
 private:
     VirtualResource const* getResource(FrameGraphHandle handle) const noexcept;

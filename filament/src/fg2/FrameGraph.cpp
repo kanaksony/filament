@@ -42,18 +42,28 @@ RenderTarget FrameGraph::Builder::useAsRenderTarget(RenderTarget::Descriptor con
     return static_cast<RenderPassNode&>(mPass).declareRenderTarget(mFrameGraph, *this, desc);
 }
 
-uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>& color) noexcept {
-    auto[attachments, id] = useAsRenderTarget({ .attachments = { .color = { color }}});
-    color = attachments.color[0];
+uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>* color) noexcept {
+    auto[attachments, id] = useAsRenderTarget({ .attachments = { .color = { *color }}});
+    *color = attachments.color[0];
     return id;
 }
 
-uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>& color,
-        FrameGraphId<Texture>& depth) noexcept {
-    auto[attachments, id] = useAsRenderTarget({
-            .attachments = { .color = { color }, .depth = depth }});
-    color = attachments.color[0];
-    depth = attachments.depth;
+uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>* color,
+        FrameGraphId<Texture>* depth) noexcept {
+    RenderTarget::Descriptor desc;
+    if (color) {
+        desc.attachments.color[0] = *color;
+    }
+    if (depth) {
+        desc.attachments.depth = *depth;
+    }
+    auto[attachments, id] = useAsRenderTarget(desc);
+    if (color) {
+        *color = attachments.color[0];
+    }
+    if (depth) {
+        *depth = attachments.depth;
+    }
     return id;
 }
 
@@ -101,6 +111,8 @@ FrameGraph& FrameGraph::compile() noexcept {
             VirtualResource* pResource = getResource(pNode->resourceHandle);
             pResource->neededByPass(pPassNode.get());
         }
+
+        pPassNode->resolve();
     }
 
     /*

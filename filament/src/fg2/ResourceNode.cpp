@@ -49,6 +49,16 @@ void ResourceNode::setIncomingEdge(DependencyGraph::Edge* edge) noexcept {
     mWriter = edge;
 }
 
+bool ResourceNode::hasActiveReaders() const noexcept {
+    DependencyGraph& dependencyGraph = mFrameGraph.getGraph();
+    for (auto const& reader : mReaders) {
+        if (!dependencyGraph.getNode(reader->to)->isCulled()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void ResourceNode::resolveResourceUsage(DependencyGraph& graph) noexcept {
     VirtualResource* pResource = mFrameGraph.getResource(resourceHandle);
     assert(pResource);
@@ -87,4 +97,5 @@ utils::CString ResourceNode::graphvizify() const {
 
     return utils::CString{ s.c_str() };
 }
+
 } // namespace filament::fg2

@@ -45,6 +45,10 @@ public:
     bool hasWriter() const noexcept {
         return mWriter != nullptr;
     }
+    bool hasReaders() const noexcept {
+        return !mReaders.empty();
+    }
+    bool hasActiveReaders() const noexcept;
 
     void resolveResourceUsage(DependencyGraph& graph) noexcept;
 

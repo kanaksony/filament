@@ -16,6 +16,7 @@
 
 #include "fg2/FrameGraph.h"
 #include "fg2/details/PassNode.h"
+#include "fg2/details/ResourceNode.h"
 
 #include <string>
 
@@ -33,28 +34,6 @@ RenderPassNode::RenderPassNode(RenderPassNode&& rhs) noexcept = default;
 RenderPassNode::~RenderPassNode() noexcept = default;
 
 void RenderPassNode::onCulled(DependencyGraph* graph) {
-}
-
-utils::CString RenderPassNode::graphvizify() const {
-    std::string s;
-
-    uint32_t id = getId();
-    const char* const nodeName = getName();
-    uint32_t refCount = getRefCount();
-
-    s.append("[label=\"");
-    s.append(nodeName);
-    s.append("\\nrefs: ");
-    s.append(std::to_string(refCount));
-    s.append(", id: ");
-    s.append(std::to_string(id));
-    s.append("\", ");
-
-    s.append("style=filled, fillcolor=");
-    s.append(refCount ? "darkorange" : "darkorange4");
-    s.append("]");
-
-    return utils::CString{ s.c_str() };
 }
 
 void RenderPassNode::execute(
@@ -92,9 +71,88 @@ RenderTarget RenderPassNode::declareRenderTarget(FrameGraph& fg, FrameGraph::Bui
         data.outgoing[5] = fg.getResourceNode(attachments.stencil);
     }
 
+    for (size_t i = 0; i < 6; i++) {
+        // if the outgoing node is the same than the incoming node, it means we in fact
+        // didn't have a incoming node (the node was created but not used yet).
+        if (data.outgoing[i] == data.incoming[i]) {
+            data.incoming[i] = nullptr;
+        }
+    }
+
     uint32_t id = mRenderTargetData.size();
     mRenderTargetData.push_back(data);
     return { data.descriptor.attachments, id };
+}
+
+void RenderPassNode::resolve() noexcept {
+    // calculate usage bits for our render targets
+
+    using namespace backend;
+
+    const backend::TargetBufferFlags flags[6] = {
+            TargetBufferFlags::COLOR0,
+            TargetBufferFlags::COLOR1,
+            TargetBufferFlags::COLOR2,
+            TargetBufferFlags::COLOR3,
+            TargetBufferFlags::DEPTH,
+            TargetBufferFlags::STENCIL
+    };
+
+    for (auto& rt : mRenderTargetData) {
+        for (size_t i = 0; i < 6; i++) {
+            // we use 'outgoing' has a proxy for 'do we have an attachment here?'
+            if (rt.outgoing[i]) {
+                // start by discarding all the attachments we have
+                // (we could set to ALL, but this is cleaner)
+                rt.params.flags.discardStart |= flags[i];
+                rt.params.flags.discardEnd   |= flags[i];
+                if (rt.outgoing[i]->hasActiveReaders()) {
+                    rt.params.flags.discardEnd &= ~flags[i];
+                }
+                if (rt.incoming[i] && rt.incoming[i]->hasWriter()) {
+                    rt.params.flags.discardStart &= ~flags[i];
+                }
+            }
+            // additionally, clear implies discardStart
+            rt.params.flags.discardStart |= rt.params.flags.clear;
+        }
+    }
+}
+
+RenderPassNode::RenderTargetData const& RenderPassNode::getRenderTargetData(
+        uint32_t id) const noexcept {
+    assert(id < mRenderTargetData.size());
+    return mRenderTargetData[id];
+}
+
+utils::CString RenderPassNode::graphvizify() const {
+    std::string s;
+
+    uint32_t id = getId();
+    const char* const nodeName = getName();
+    uint32_t refCount = getRefCount();
+
+    s.append("[label=\"");
+    s.append(nodeName);
+    s.append("\\nrefs: ");
+    s.append(std::to_string(refCount));
+    s.append(", id: ");
+    s.append(std::to_string(id));
+
+    for (auto const& rt :mRenderTargetData) {
+        s.append("\\nS:");
+        s.append(utils::to_string(rt.params.flags.discardStart).c_str());
+        s.append(", E:");
+        s.append(utils::to_string(rt.params.flags.discardEnd).c_str());
+    }
+
+    s.append("\", ");
+
+    s.append("style=filled, fillcolor=");
+    s.append(refCount ? "darkorange" : "darkorange4");
+    s.append("]");
+
+    return utils::CString{ s.c_str() };
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -124,6 +182,9 @@ utils::CString PresentPassNode::graphvizify() const {
 }
 
 void PresentPassNode::execute(FrameGraphResources const&, backend::DriverApi&) noexcept {
+}
+
+void PresentPassNode::resolve() noexcept {
 }
 
 } // namespace filament::fg2

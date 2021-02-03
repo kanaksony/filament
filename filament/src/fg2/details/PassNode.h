@@ -44,16 +44,27 @@ public:
     using NodeID = DependencyGraph::NodeID;
 
     virtual void execute(FrameGraphResources const& resources, backend::DriverApi& driver) noexcept = 0;
+    virtual void resolve() noexcept = 0;
 };
 
 class RenderPassNode : public PassNode {
 public:
+    struct RenderTargetData {
+        RenderTarget::Descriptor descriptor;
+        ResourceNode* incoming[6] = {};  // nodes of the incoming attachments
+        ResourceNode* outgoing[6] = {};  // nodes of the outgoing attachments
+        backend::Handle<backend::HwRenderTarget> target;
+        backend::RenderPassParams params;
+    };
+
     RenderPassNode(FrameGraph& fg, const char* name, PassExecutor* base) noexcept;
     RenderPassNode(RenderPassNode&& rhs) noexcept;
     ~RenderPassNode() noexcept override;
 
     RenderTarget declareRenderTarget(FrameGraph& fg, FrameGraph::Builder& builder,
             RenderTarget::Descriptor const& descriptor) noexcept;
+
+    RenderTargetData const& getRenderTargetData(uint32_t id) const noexcept;
 
     // constants
     const char* const name = nullptr;                   // our name
@@ -65,14 +76,7 @@ private:
     void onCulled(DependencyGraph* graph) override;
     utils::CString graphvizify() const override;
     void execute(FrameGraphResources const& resources, backend::DriverApi& driver) noexcept override;
-
-    struct RenderTargetData {
-        RenderTarget::Descriptor descriptor;
-        ResourceNode* incoming[6] = {};  // nodes of the incoming attachments
-        ResourceNode* outgoing[6] = {};  // nodes of the outgoing attachments
-        backend::Handle<backend::HwRenderTarget> target;
-        backend::RenderPassParams params;
-    };
+    void resolve() noexcept override;
 
     std::vector<RenderTargetData> mRenderTargetData;
 };
@@ -85,6 +89,7 @@ public:
     PresentPassNode(PresentPassNode const&) = delete;
     PresentPassNode& operator=(PresentPassNode const&) = delete;
     void execute(FrameGraphResources const& resources, backend::DriverApi& driver) noexcept override;
+    void resolve() noexcept override;
 private:
     // virtuals from DependencyGraph::Node
     char const* getName() const override;

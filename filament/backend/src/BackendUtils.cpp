@@ -357,4 +357,29 @@ CString to_string<filament::backend::TextureUsage>(filament::backend::TextureUsa
     return CString(string, 6);
 }
 
+template<>
+CString to_string<filament::backend::TargetBufferFlags>(filament::backend::TargetBufferFlags flags) noexcept {
+    using namespace filament::backend;
+    char string[7] = {'-', '-', '-', '-', '-', '-', 0};
+    if (any(flags & TargetBufferFlags::COLOR0)) {
+        string[0]='0';
+    }
+    if (any(flags & TargetBufferFlags::COLOR1)) {
+        string[1]='1';
+    }
+    if (any(flags & TargetBufferFlags::COLOR2)) {
+        string[2]='2';
+    }
+    if (any(flags & TargetBufferFlags::COLOR3)) {
+        string[3]='3';
+    }
+    if (any(flags & TargetBufferFlags::DEPTH)) {
+        string[4]='D';
+    }
+    if (any(flags & TargetBufferFlags::STENCIL)) {
+        string[5]='S';
+    }
+    return CString(string, 6);
+}
+
 } // namespace utils

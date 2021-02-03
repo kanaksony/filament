@@ -32,6 +32,14 @@ VirtualResource const* FrameGraphResources::getResource(FrameGraphHandle handle)
     return mFrameGraph.getResource(handle);
 }
 
+FrameGraphResources::RenderPassInfo FrameGraphResources::getRenderPassInfo(
+        uint32_t id) const noexcept {
+    // this cast is safe because this can only be called from a RenderPassNode
+    RenderPassNode const& renderPassNode = static_cast<RenderPassNode const&>(mPassNode);
+    RenderPassNode::RenderTargetData const& rt = renderPassNode.getRenderTargetData(id);
+    return { rt.target, rt.params };
+}
+
 } // namespace filament::fg2
 
 

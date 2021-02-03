@@ -77,7 +77,7 @@ public:
          * @param color color attachment subresource
          * @return the id of this Render Target
          */
-        uint32_t useAsRenderTarget(FrameGraphId<Texture>& color) noexcept;
+        uint32_t useAsRenderTarget(FrameGraphId <Texture>* color) noexcept;
 
         /**
          * Helper to easily declare a render target with a color and depth attachment.
@@ -91,7 +91,7 @@ public:
          * @param color color attachment subresource
          * @return the id of this Render Target
          */
-        uint32_t useAsRenderTarget(FrameGraphId<Texture>& color, FrameGraphId<Texture>& depth) noexcept;
+        uint32_t useAsRenderTarget(FrameGraphId <Texture>* color, FrameGraphId <Texture>* depth) noexcept;
 
 
         /**

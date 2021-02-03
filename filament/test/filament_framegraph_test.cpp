@@ -613,6 +613,7 @@ TEST(FrameGraph2Test, Simple) {
 }
 
 TEST_F(FrameGraphTest, FG2Complexe) {
+    using namespace backend;
     using namespace fg2;
     MockResourceAllocator resourceAllocator;
     fg2::FrameGraph fg(resourceAllocator);
@@ -623,11 +624,14 @@ TEST_F(FrameGraphTest, FG2Complexe) {
     auto& depthPass = fg.addPass<DepthPassData>("Depth pass",
             [&](fg2::FrameGraph::Builder& builder, auto& data) {
                 data.depth = builder.create<Texture>("Depth Buffer", {.width=16, .height=32});
-                data.depth = builder.write(data.depth, Texture::Usage::DEPTH_ATTACHMENT);
+                builder.useAsRenderTarget(nullptr, &data.depth);
             },
             [=](fg2::FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
                 Texture const& depth = resources.get(data.depth);
                 EXPECT_TRUE((bool)depth.texture);
+                auto rp = resources.getRenderPassInfo();
+                EXPECT_EQ(rp.params.flags.discardStart, TargetBufferFlags::DEPTH);
+                EXPECT_EQ(rp.params.flags.discardEnd, TargetBufferFlags::NONE);
             });
 
     struct GBufferPassData {
@@ -643,11 +647,14 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 data.gbuf1 = builder.create<Texture>("Gbuffer 1", desc);
                 data.gbuf2 = builder.create<Texture>("Gbuffer 2", desc);
                 data.gbuf3 = builder.create<Texture>("Gbuffer 3", desc);
-
-                data.depth = builder.write(data.depth, Texture::Usage::DEPTH_ATTACHMENT);
-                data.gbuf1 = builder.write(data.gbuf1, Texture::Usage::COLOR_ATTACHMENT);
-                data.gbuf2 = builder.write(data.gbuf2, Texture::Usage::COLOR_ATTACHMENT);
-                data.gbuf3 = builder.write(data.gbuf3, Texture::Usage::COLOR_ATTACHMENT);
+                auto rt = builder.useAsRenderTarget({ .attachments = {
+                                .color = { data.gbuf1, data.gbuf2, data.gbuf3 },
+                                .depth = data.depth
+                        }});
+                data.depth = rt.attachments.depth;
+                data.gbuf1 = rt.attachments.color[0];
+                data.gbuf2 = rt.attachments.color[1];
+                data.gbuf3 = rt.attachments.color[2];
             },
             [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
                 Texture const& depth = resources.get(data.depth);
@@ -658,6 +665,12 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 EXPECT_TRUE((bool)gbuf1.texture);
                 EXPECT_TRUE((bool)gbuf2.texture);
                 EXPECT_TRUE((bool)gbuf3.texture);
+                auto rp = resources.getRenderPassInfo();
+                EXPECT_EQ(rp.params.flags.discardStart,
+                        TargetBufferFlags::COLOR0
+                        | TargetBufferFlags::COLOR1
+                        | TargetBufferFlags::COLOR2);
+                EXPECT_EQ(rp.params.flags.discardEnd, TargetBufferFlags::COLOR0);
             });
 
     struct LightingPassData {
@@ -670,12 +683,12 @@ TEST_F(FrameGraphTest, FG2Complexe) {
     auto& lightingPass = fg.addPass<LightingPassData>("Lighting pass",
             [&](fg2::FrameGraph::Builder& builder, auto& data) {
                 data.depth = builder.read(gBufferPass->depth, Texture::Usage::SAMPLEABLE);
-                data.gbuf1 = gBufferPass->gbuf1; //builder.read(gBufferPass->gbuf1, Texture::Usage::SAMPLEABLE);
+                data.gbuf1 = gBufferPass->gbuf1;
                 data.gbuf2 = builder.read(gBufferPass->gbuf2, Texture::Usage::SAMPLEABLE);
                 data.gbuf3 = builder.read(gBufferPass->gbuf3, Texture::Usage::SAMPLEABLE);
                 Texture::Descriptor desc = builder.getDescriptor(data.depth);
                 data.lightingBuffer = builder.create<Texture>("Lighting buffer", desc);
-                data.lightingBuffer = builder.write(data.lightingBuffer, Texture::Usage::COLOR_ATTACHMENT);
+                builder.useAsRenderTarget(&data.lightingBuffer);
             },
             [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
                 Texture const& lightingBuffer = resources.get(data.lightingBuffer);
@@ -688,6 +701,9 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 EXPECT_FALSE((bool)gbuf1.texture);
                 EXPECT_TRUE((bool)gbuf2.texture);
                 EXPECT_TRUE((bool)gbuf3.texture);
+                auto rp = resources.getRenderPassInfo();
+                EXPECT_EQ(rp.params.flags.discardStart,TargetBufferFlags::COLOR0);
+                EXPECT_EQ(rp.params.flags.discardEnd, TargetBufferFlags::NONE);
             });
 
     struct DebugPass {
@@ -703,7 +719,7 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 data.gbuf3 = builder.read(lightingPass->gbuf3, Texture::Usage::SAMPLEABLE);
                 Texture::Descriptor desc = builder.getDescriptor(data.gbuf1);
                 data.debugBuffer = builder.create<Texture>("Debug buffer", desc);
-                data.debugBuffer = builder.write(data.debugBuffer, Texture::Usage::COLOR_ATTACHMENT);
+                builder.useAsRenderTarget(&data.debugBuffer);
             },
             [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
                 Texture const& debugBuffer = resources.get(data.debugBuffer);
@@ -731,8 +747,7 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 data.lightingBuffer = builder.read(lightingPass->lightingBuffer, Texture::Usage::SAMPLEABLE);
                 Texture::Descriptor desc = builder.getDescriptor(data.lightingBuffer);
                 data.backBuffer = builder.create<Texture>("Backbuffer", desc);
-                data.backBuffer = builder.write(data.backBuffer, Texture::Usage::COLOR_ATTACHMENT);
-
+                builder.useAsRenderTarget(&data.backBuffer);
                 data.destroyed.depth = lightingPass->depth;
                 data.destroyed.gbuf1 = lightingPass->gbuf1;
                 data.destroyed.gbuf2 = lightingPass->gbuf2;
@@ -754,6 +769,10 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 EXPECT_EQ(resources.getUsage(data.destroyed.gbuf1),                              Texture::Usage::COLOR_ATTACHMENT);
                 EXPECT_EQ(resources.getUsage(data.destroyed.gbuf2), Texture::Usage::SAMPLEABLE | Texture::Usage::COLOR_ATTACHMENT);
                 EXPECT_EQ(resources.getUsage(data.destroyed.gbuf3), Texture::Usage::SAMPLEABLE | Texture::Usage::COLOR_ATTACHMENT);
+
+                auto rp = resources.getRenderPassInfo();
+                EXPECT_EQ(rp.params.flags.discardStart,TargetBufferFlags::COLOR0);
+                EXPECT_EQ(rp.params.flags.discardEnd, TargetBufferFlags::NONE);
             });
 
     fg.present(postPass->backBuffer);
