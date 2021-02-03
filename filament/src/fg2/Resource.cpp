@@ -43,4 +43,12 @@ DependencyGraph::Node* VirtualResource::toDependencyGraphNode(PassNode* node) no
     return node;
 }
 
+void VirtualResource::neededByPass(PassNode* pNode) noexcept {
+    refcount++;
+    // figure out which is the first pass to need this resource
+    first = first ? first : pNode;
+    // figure out which is the last pass to need this resource
+    last = pNode;
+}
+
 } // namespace filament::fg2

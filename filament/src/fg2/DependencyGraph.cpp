@@ -163,7 +163,7 @@ void DependencyGraph::export_graphviz(utils::io::ostream& out, char const* name)
         // render the invalid edges
         if (first != edges.end()) {
             out << "N" << id << " -> { ";
-            while (first != pos) {
+            while (first != edges.end()) {
                 Node const* ref = getNode((*first++)->to);
                 out << "N" << ref->getId() << " ";
             }

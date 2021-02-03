@@ -52,12 +52,16 @@ public:
     VirtualResource& operator=(VirtualResource const&) = delete;
     virtual ~VirtualResource() noexcept;
 
+    // updates first/last/refcount
+    void neededByPass(PassNode* pNode) noexcept;
+
     /*
      * Called during FrameGraph::compile(), this gives an opportunity for this resource to
      * calculate its effective usage flags.
      */
     virtual void resolveUsage(DependencyGraph& graph,
-            DependencyGraph::Edge const* const* edges, size_t count) noexcept = 0;
+            DependencyGraph::Edge const* const* edges, size_t count,
+            DependencyGraph::Edge const* writer) noexcept = 0;
 
     /* Instantiate the concrete resource */
     virtual void devirtualize(ResourceAllocatorInterface& resourceAllocator) noexcept = 0;
@@ -138,17 +142,17 @@ private:
      * The virtual below must be in a header file as RESOURCE is only known at compile time
      */
 
-    void resolveUsage(DependencyGraph& graph, DependencyGraph::Edge const* const* edges,
-            size_t count) noexcept override {
+    void resolveUsage(DependencyGraph& graph,
+            DependencyGraph::Edge const* const* edges, size_t count,
+            DependencyGraph::Edge const* writer) noexcept override {
         for (size_t i = 0; i < count; i++) {
-
-            // FIXME: even if a resource is culled because nobody reads from it
-            //        but a non-culled pass writes to it, that resource will need to be
-            //        devirtualized, so it's usage bits need to be calculated.
-
             if (graph.isEdgeValid(edges[i])) {
                 // this Edge is guaranteed to be a ResourceEdge<RESOURCE> by construction
                 ResourceEdge const* const edge = static_cast<ResourceEdge const*>(edges[i]);
+                usage |= edge->usage;
+            }
+            if (writer) {
+                ResourceEdge const* const edge = static_cast<ResourceEdge const*>(writer);
                 usage |= edge->usage;
             }
         }

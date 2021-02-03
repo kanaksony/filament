@@ -73,21 +73,11 @@ FrameGraph& FrameGraph::compile() noexcept {
     // first we cull unreachable nodes
     dependencyGraph.cull();
 
-    // update the reference counter of the resource themselves
-    for (auto& pNode : mResourceNodes) {
-        VirtualResource* pResource = getResource(pNode->resourceHandle);
-        pResource->refcount += pNode->getRefCount();
-
-        // Resolve Usage bits
-        auto const& outgoing = pNode->getOutgoingEdges();
-        pResource->resolveUsage(dependencyGraph, outgoing.data(), outgoing.size());
-        auto const& incoming = pNode->getIncomingEdges(); // there is always only one writer/node
-        pResource->resolveUsage(dependencyGraph, incoming.data(), incoming.size());
-    }
-
     /*
+     * update the reference counter of the resource themselves and
      * compute first/last users for active passes
      */
+
     for (auto& pPassNode : mPassNodes) {
         if (pPassNode->isCulled()) {
             continue;
@@ -95,37 +85,29 @@ FrameGraph& FrameGraph::compile() noexcept {
 
         auto const& reads = dependencyGraph.getIncomingEdges(pPassNode.get());
         for (auto const& edge : reads) {
-
-            // FIXME: even if a resource is culled because nobody reads from it
-            //        but a non-culled pass writes to it, that resource will need to be
-            //        devirtualized
-
-            if (dependencyGraph.isEdgeValid(edge)) {
-                auto const* node = static_cast<ResourceNode const*>(dependencyGraph.getNode(edge->from));
-                VirtualResource* const pResource = getResource(node->resourceHandle);
-                // figure out which is the first pass to need this resource
-                pResource->first = pResource->first ? pResource->first : pPassNode.get();
-                // figure out which is the last pass to need this resource
-                pResource->last = pPassNode.get();
-            }
+            // all incoming edges should be valid by construction
+            assert(dependencyGraph.isEdgeValid(edge));
+            auto pNode = static_cast<ResourceNode*>(dependencyGraph.getNode(edge->from));
+            VirtualResource* pResource = getResource(pNode->resourceHandle);
+            pResource->neededByPass(pPassNode.get());
         }
 
         auto const& writes = dependencyGraph.getOutgoingEdges(pPassNode.get());
         for (auto const& edge : writes) {
-
-            // FIXME: even if a resource is culled because nobody reads from it
-            //        but a non-culled pass writes to it, that resource will need to be
-            //        devirtualized
-
-            if (dependencyGraph.isEdgeValid(edge)) {
-                auto const* node = static_cast<ResourceNode const*>(dependencyGraph.getNode(edge->to));
-                VirtualResource* const pResource = getResource(node->resourceHandle);
-                // figure out which is the first pass to need this resource
-                pResource->first = pResource->first ? pResource->first : pPassNode.get();
-                // figure out which is the last pass to need this resource
-                pResource->last = pPassNode.get();
-            }
+            // an outgoing edge might be invalid if the node it points to has been culled
+            // but, because we are not culled and we're a pass, we add a reference to
+            // the resource we are writing to.
+            auto pNode = static_cast<ResourceNode*>(dependencyGraph.getNode(edge->to));
+            VirtualResource* pResource = getResource(pNode->resourceHandle);
+            pResource->neededByPass(pPassNode.get());
         }
+    }
+
+    /*
+     * Resolve Usage bits
+     */
+    for (auto& pNode : mResourceNodes) {
+        pNode->resolveResourceUsage(dependencyGraph);
     }
 
     dependencyGraph.export_graphviz(utils::slog.d);

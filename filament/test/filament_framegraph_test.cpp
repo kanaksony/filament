@@ -670,7 +670,7 @@ TEST_F(FrameGraphTest, FG2Complexe) {
     auto& lightingPass = fg.addPass<LightingPassData>("Lighting pass",
             [&](fg2::FrameGraph::Builder& builder, auto& data) {
                 data.depth = builder.read(gBufferPass->depth, Texture::Usage::SAMPLEABLE);
-                data.gbuf1 = builder.read(gBufferPass->gbuf1, Texture::Usage::SAMPLEABLE);
+                data.gbuf1 = gBufferPass->gbuf1; //builder.read(gBufferPass->gbuf1, Texture::Usage::SAMPLEABLE);
                 data.gbuf2 = builder.read(gBufferPass->gbuf2, Texture::Usage::SAMPLEABLE);
                 data.gbuf3 = builder.read(gBufferPass->gbuf3, Texture::Usage::SAMPLEABLE);
                 Texture::Descriptor desc = builder.getDescriptor(data.depth);
@@ -685,6 +685,32 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 Texture const& gbuf3 = resources.get(data.gbuf3);
                 EXPECT_TRUE((bool)lightingBuffer.texture);
                 EXPECT_TRUE((bool)depth.texture);
+                EXPECT_FALSE((bool)gbuf1.texture);
+                EXPECT_TRUE((bool)gbuf2.texture);
+                EXPECT_TRUE((bool)gbuf3.texture);
+            });
+
+    struct DebugPass {
+        fg2::FrameGraphId<Texture> debugBuffer;
+        fg2::FrameGraphId<Texture> gbuf1;
+        fg2::FrameGraphId<Texture> gbuf2;
+        fg2::FrameGraphId<Texture> gbuf3;
+    };
+    auto& culledPass = fg.addPass<DebugPass>("DebugPass pass",
+            [&](fg2::FrameGraph::Builder& builder, auto& data) {
+                data.gbuf1 = builder.read(lightingPass->gbuf1, Texture::Usage::SAMPLEABLE);
+                data.gbuf2 = builder.read(lightingPass->gbuf2, Texture::Usage::SAMPLEABLE);
+                data.gbuf3 = builder.read(lightingPass->gbuf3, Texture::Usage::SAMPLEABLE);
+                Texture::Descriptor desc = builder.getDescriptor(data.gbuf1);
+                data.debugBuffer = builder.create<Texture>("Debug buffer", desc);
+                data.debugBuffer = builder.write(data.debugBuffer, Texture::Usage::COLOR_ATTACHMENT);
+            },
+            [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
+                Texture const& debugBuffer = resources.get(data.debugBuffer);
+                Texture const& gbuf1 = resources.get(data.gbuf1);
+                Texture const& gbuf2 = resources.get(data.gbuf2);
+                Texture const& gbuf3 = resources.get(data.gbuf3);
+                EXPECT_FALSE((bool)debugBuffer.texture);
                 EXPECT_TRUE((bool)gbuf1.texture);
                 EXPECT_TRUE((bool)gbuf2.texture);
                 EXPECT_TRUE((bool)gbuf3.texture);
@@ -700,7 +726,7 @@ TEST_F(FrameGraphTest, FG2Complexe) {
             fg2::FrameGraphId<Texture> gbuf3;
         } destroyed;
     };
-    auto& postPass = fg.addPass<PostPassData>("Lighting pass",
+    auto& postPass = fg.addPass<PostPassData>("Post pass",
             [&](fg2::FrameGraph::Builder& builder, auto& data) {
                 data.lightingBuffer = builder.read(lightingPass->lightingBuffer, Texture::Usage::SAMPLEABLE);
                 Texture::Descriptor desc = builder.getDescriptor(data.lightingBuffer);
@@ -725,7 +751,7 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 EXPECT_EQ(resources.getUsage(data.lightingBuffer),  Texture::Usage::SAMPLEABLE | Texture::Usage::COLOR_ATTACHMENT);
                 EXPECT_EQ(resources.getUsage(data.backBuffer),                                   Texture::Usage::COLOR_ATTACHMENT);
                 EXPECT_EQ(resources.getUsage(data.destroyed.depth), Texture::Usage::SAMPLEABLE | Texture::Usage::DEPTH_ATTACHMENT);
-                EXPECT_EQ(resources.getUsage(data.destroyed.gbuf1), Texture::Usage::SAMPLEABLE | Texture::Usage::COLOR_ATTACHMENT);
+                EXPECT_EQ(resources.getUsage(data.destroyed.gbuf1),                              Texture::Usage::COLOR_ATTACHMENT);
                 EXPECT_EQ(resources.getUsage(data.destroyed.gbuf2), Texture::Usage::SAMPLEABLE | Texture::Usage::COLOR_ATTACHMENT);
                 EXPECT_EQ(resources.getUsage(data.destroyed.gbuf3), Texture::Usage::SAMPLEABLE | Texture::Usage::COLOR_ATTACHMENT);
             });
