@@ -56,11 +56,11 @@ SimpleViewer::SimpleViewer(filament::Engine* engine, filament::Scene* scene, fil
 
     mSettings.view.shadowType = ShadowType::PCF;
     mSettings.view.vsmShadowOptions.anisotropy = 0;
-    mSettings.view.dithering = Dithering::TEMPORAL;
-    mSettings.view.antiAliasing = AntiAliasing::FXAA;
-    mSettings.view.sampleCount = 4;
-    mSettings.view.ssao.enabled = true;
-    mSettings.view.bloom.enabled = true;
+    mSettings.view.dithering = Dithering::NONE; // TEMPORAL
+    mSettings.view.antiAliasing = AntiAliasing::NONE; // FXAA
+    mSettings.view.sampleCount = 1; // 4
+    mSettings.view.ssao.enabled = false; // true
+    mSettings.view.bloom.enabled = false; // true
 
     using namespace filament;
     LightManager::Builder(LightManager::Type::SUN)

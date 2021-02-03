@@ -41,6 +41,12 @@ static const PFN_vkGetDeviceProcAddr& vkGetDeviceProcAddr = bluevk::vkGetDeviceP
 
 #include <utils/Panic.h>
 
+#include <vulkan/vulkan_beta.h> // TODO: remove after PORTABILITY gets included in core headers
+
+#ifndef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+#define VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME "VK_KHR_portability_subset"
+#endif
+
 using namespace bluevk;
 
 namespace filament {
@@ -125,6 +131,9 @@ void selectPhysicalDevice(VulkanContext& context) {
             if (!strcmp(extensions[k].extensionName, VK_EXT_DEBUG_MARKER_EXTENSION_NAME)) {
                 context.debugMarkersSupported = true;
             }
+            if (!strcmp(extensions[k].extensionName, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
+                context.portabilitySubsetSupported = true;
+            }
         }
         if (!supportsSwapchain) continue;
 
@@ -189,6 +198,9 @@ void createLogicalDevice(VulkanContext& context) {
     };
     if (context.debugMarkersSupported && !context.debugUtilsSupported) {
         deviceExtensionNames.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+    }
+    if (context.portabilitySubsetSupported) {
+        deviceExtensionNames.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
     }
     deviceQueueCreateInfo->sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     deviceQueueCreateInfo->queueFamilyIndex = context.graphicsQueueFamilyIndex;
