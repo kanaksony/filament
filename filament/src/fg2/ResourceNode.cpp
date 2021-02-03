@@ -33,10 +33,10 @@ ResourceNode::~ResourceNode() noexcept {
     }
 }
 
-void ResourceNode::onCulled(DependencyGraph* graph) {
+void ResourceNode::onCulled(DependencyGraph* graph) noexcept {
 }
 
-char const* ResourceNode::getName() const {
+char const* ResourceNode::getName() const noexcept {
     return mFrameGraph.getResource(resourceHandle)->name;
 }
 
@@ -67,7 +67,7 @@ void ResourceNode::resolveResourceUsage(DependencyGraph& graph) noexcept {
     }
 }
 
-utils::CString ResourceNode::graphvizify() const {
+utils::CString ResourceNode::graphvizify() const noexcept {
     std::string s;
     s.reserve(128);
 
@@ -96,6 +96,10 @@ utils::CString ResourceNode::graphvizify() const {
     s.shrink_to_fit();
 
     return utils::CString{ s.c_str() };
+}
+
+utils::CString ResourceNode::graphvizifyEdgeColor() const noexcept {
+    return utils::CString{"darkolivegreen"};
 }
 
 } // namespace filament::fg2

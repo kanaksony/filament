@@ -45,6 +45,7 @@ public:
 
     virtual void execute(FrameGraphResources const& resources, backend::DriverApi& driver) noexcept = 0;
     virtual void resolve() noexcept = 0;
+    utils::CString graphvizifyEdgeColor() const noexcept override;
 };
 
 class RenderPassNode : public PassNode {
@@ -72,9 +73,9 @@ public:
 
 private:
     // virtuals from DependencyGraph::Node
-    char const* getName() const override { return name; }
-    void onCulled(DependencyGraph* graph) override;
-    utils::CString graphvizify() const override;
+    char const* getName() const noexcept override { return name; }
+    void onCulled(DependencyGraph* graph) noexcept override;
+    utils::CString graphvizify() const noexcept override;
     void execute(FrameGraphResources const& resources, backend::DriverApi& driver) noexcept override;
     void resolve() noexcept override;
 
@@ -92,9 +93,9 @@ public:
     void resolve() noexcept override;
 private:
     // virtuals from DependencyGraph::Node
-    char const* getName() const override;
-    void onCulled(DependencyGraph* graph) override;
-    utils::CString graphvizify() const override;
+    char const* getName() const noexcept override;
+    void onCulled(DependencyGraph* graph) noexcept override;
+    utils::CString graphvizify() const noexcept override;
 };
 
 } // namespace filament::fg2

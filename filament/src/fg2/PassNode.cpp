@@ -25,6 +25,10 @@ namespace filament::fg2 {
 PassNode::PassNode(PassNode&& rhs) noexcept = default;
 PassNode::~PassNode() noexcept = default;
 
+utils::CString PassNode::graphvizifyEdgeColor() const noexcept {
+    return utils::CString{"red"};
+}
+
 // ------------------------------------------------------------------------------------------------
 
 RenderPassNode::RenderPassNode(FrameGraph& fg, const char* name, PassExecutor* base) noexcept
@@ -33,7 +37,7 @@ RenderPassNode::RenderPassNode(FrameGraph& fg, const char* name, PassExecutor* b
 RenderPassNode::RenderPassNode(RenderPassNode&& rhs) noexcept = default;
 RenderPassNode::~RenderPassNode() noexcept = default;
 
-void RenderPassNode::onCulled(DependencyGraph* graph) {
+void RenderPassNode::onCulled(DependencyGraph* graph) noexcept {
 }
 
 void RenderPassNode::execute(
@@ -125,7 +129,7 @@ RenderPassNode::RenderTargetData const& RenderPassNode::getRenderTargetData(
     return mRenderTargetData[id];
 }
 
-utils::CString RenderPassNode::graphvizify() const {
+utils::CString RenderPassNode::graphvizify() const noexcept {
     std::string s;
 
     uint32_t id = getId();
@@ -163,14 +167,14 @@ PresentPassNode::PresentPassNode(FrameGraph& fg) noexcept
 PresentPassNode::PresentPassNode(PresentPassNode&& rhs) noexcept = default;
 PresentPassNode::~PresentPassNode() noexcept = default;
 
-char const* PresentPassNode::getName() const {
+char const* PresentPassNode::getName() const noexcept {
     return "Present";
 }
 
-void PresentPassNode::onCulled(DependencyGraph* graph) {
+void PresentPassNode::onCulled(DependencyGraph* graph) noexcept {
 }
 
-utils::CString PresentPassNode::graphvizify() const {
+utils::CString PresentPassNode::graphvizify() const noexcept {
     std::string s;
     s.reserve(128);
     uint32_t id = getId();

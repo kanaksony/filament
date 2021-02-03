@@ -456,8 +456,8 @@ TEST_F(FrameGraphTest, MoveGenericResource) {
 class Node : public fg2::DependencyGraph::Node {
     const char *mName;
     bool mCulledCalled = false;
-    char const* getName() const override { return mName; }
-    void onCulled(fg2::DependencyGraph* graph) override { mCulledCalled = true; }
+    char const* getName() const noexcept override { return mName; }
+    void onCulled(fg2::DependencyGraph* graph) noexcept override { mCulledCalled = true; }
 public:
     Node(fg2::DependencyGraph& graph, const char* name) noexcept : fg2::DependencyGraph::Node(graph), mName(name) { }
     bool isCulledCalled() const noexcept { return mCulledCalled; }

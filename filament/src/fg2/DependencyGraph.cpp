@@ -150,6 +150,8 @@ void DependencyGraph::export_graphviz(utils::io::ostream& out, char const* name)
         auto pos = std::partition(first, edges.end(),
                 [this](auto const& edge) { return isEdgeValid(edge); });
 
+        utils::CString s = node->graphvizifyEdgeColor();
+
         // render the valid edges
         if (first != pos) {
             out << "N" << id << " -> { ";
@@ -157,7 +159,7 @@ void DependencyGraph::export_graphviz(utils::io::ostream& out, char const* name)
                 Node const* ref = getNode((*first++)->to);
                 out << "N" << ref->getId() << " ";
             }
-            out << "} [color=red2]\n";
+            out << "} [color=" << s.c_str() << "2]\n";
         }
 
         // render the invalid edges
@@ -167,7 +169,7 @@ void DependencyGraph::export_graphviz(utils::io::ostream& out, char const* name)
                 Node const* ref = getNode((*first++)->to);
                 out << "N" << ref->getId() << " ";
             }
-            out << "} [color=red4 style=dashed]\n";
+            out << "} [color=" << s.c_str() << "4 style=dashed]\n";
         }
     }
 
@@ -204,14 +206,18 @@ bool DependencyGraph::Node::isTarget() const noexcept {
     return mRefCount >= TARGET;
 }
 
-char const* DependencyGraph::Node::getName() const {
+char const* DependencyGraph::Node::getName() const noexcept {
     return "unknown";
 }
 
-void DependencyGraph::Node::onCulled(DependencyGraph* graph) {
+void DependencyGraph::Node::onCulled(DependencyGraph* graph) noexcept {
 }
 
-utils::CString DependencyGraph::Node::graphvizify() const {
+utils::CString DependencyGraph::Node::graphvizify() const noexcept {
+    return utils::CString{};
+}
+
+utils::CString DependencyGraph::Node::graphvizifyEdgeColor() const noexcept {
     return utils::CString{};
 }
 

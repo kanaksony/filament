@@ -54,9 +54,10 @@ public:
 
 private:
     // virtuals from DependencyGraph::Node
-    char const* getName() const override;
-    void onCulled(DependencyGraph* graph) override;
-    utils::CString graphvizify() const override;
+    char const* getName() const noexcept override;
+    void onCulled(DependencyGraph* graph) noexcept override;
+    utils::CString graphvizify() const noexcept override;
+    utils::CString graphvizifyEdgeColor() const noexcept override;
 
 private:
     FrameGraph& mFrameGraph;

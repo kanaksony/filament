@@ -108,13 +108,16 @@ public:
 
     public:
         //! return the name of this node
-        virtual char const* getName() const;
+        virtual char const* getName() const noexcept;
 
         //! called from DependencyGraph::cull() when a node a culled
-        virtual void onCulled(DependencyGraph* graph);
+        virtual void onCulled(DependencyGraph* graph) noexcept;
 
         //! output itself as a graphviz string
-        virtual utils::CString graphvizify() const;
+        virtual utils::CString graphvizify() const noexcept;
+
+        //! output a graphviz color string for an Edge from this node
+        virtual utils::CString graphvizifyEdgeColor() const noexcept;
 
     private:
         // nodes that read from us: i.e. we have a reference to them
