@@ -36,7 +36,7 @@ class ResourceNode;
 
 class PassNode : public DependencyGraph::Node {
 public:
-    using DependencyGraph::Node::Node;
+    PassNode(FrameGraph& fg) noexcept;
     PassNode(PassNode&& rhs) noexcept;
     PassNode(PassNode const&) = delete;
     PassNode& operator=(PassNode const&) = delete;
@@ -51,11 +51,16 @@ public:
 class RenderPassNode : public PassNode {
 public:
     struct RenderTargetData {
+        const char* name = {};
         RenderTarget::Descriptor descriptor;
+        backend::TargetBufferFlags targetBufferFlags = {};
+        FrameGraphId<Texture> attachmentInfo[6] = {};
         ResourceNode* incoming[6] = {};  // nodes of the incoming attachments
         ResourceNode* outgoing[6] = {};  // nodes of the outgoing attachments
-        backend::Handle<backend::HwRenderTarget> target;
-        backend::RenderPassParams params;
+        struct {
+            backend::Handle<backend::HwRenderTarget> target;
+            backend::RenderPassParams params;
+        } backend;
     };
 
     RenderPassNode(FrameGraph& fg, const char* name, PassExecutor* base) noexcept;
@@ -63,22 +68,23 @@ public:
     ~RenderPassNode() noexcept override;
 
     RenderTarget declareRenderTarget(FrameGraph& fg, FrameGraph::Builder& builder,
-            RenderTarget::Descriptor const& descriptor) noexcept;
+            const char* name, RenderTarget::Descriptor const& descriptor) noexcept;
 
     RenderTargetData const& getRenderTargetData(uint32_t id) const noexcept;
 
-    // constants
-    const char* const name = nullptr;                   // our name
-    UniquePtr<PassExecutor, LinearAllocatorArena> base; // type eraser for calling execute()
-
 private:
     // virtuals from DependencyGraph::Node
-    char const* getName() const noexcept override { return name; }
+    char const* getName() const noexcept override { return mName; }
     void onCulled(DependencyGraph* graph) noexcept override;
     utils::CString graphvizify() const noexcept override;
     void execute(FrameGraphResources const& resources, backend::DriverApi& driver) noexcept override;
     void resolve() noexcept override;
 
+    // constants
+    FrameGraph& mFrameGraph;
+    const char* const mName = nullptr;
+    UniquePtr<PassExecutor, LinearAllocatorArena> mPassExecutor;
+    // set during setup
     std::vector<RenderTargetData> mRenderTargetData;
 };
 

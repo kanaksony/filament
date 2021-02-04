@@ -17,10 +17,16 @@
 #include "fg2/FrameGraph.h"
 #include "fg2/details/PassNode.h"
 #include "fg2/details/ResourceNode.h"
+#include "ResourceAllocator.h"
+
+#include <details/Texture.h>
 
 #include <string>
 
 namespace filament::fg2 {
+
+PassNode::PassNode(FrameGraph& fg) noexcept : DependencyGraph::Node(fg.getGraph()) {
+}
 
 PassNode::PassNode(PassNode&& rhs) noexcept = default;
 PassNode::~PassNode() noexcept = default;
@@ -32,7 +38,7 @@ utils::CString PassNode::graphvizifyEdgeColor() const noexcept {
 // ------------------------------------------------------------------------------------------------
 
 RenderPassNode::RenderPassNode(FrameGraph& fg, const char* name, PassExecutor* base) noexcept
-        : PassNode(fg.getGraph()), name(name), base(base, fg.getArena()) {
+        : PassNode(fg), mFrameGraph(fg), mName(name), mPassExecutor(base, fg.getArena()) {
 }
 RenderPassNode::RenderPassNode(RenderPassNode&& rhs) noexcept = default;
 RenderPassNode::~RenderPassNode() noexcept = default;
@@ -40,46 +46,76 @@ RenderPassNode::~RenderPassNode() noexcept = default;
 void RenderPassNode::onCulled(DependencyGraph* graph) noexcept {
 }
 
-void RenderPassNode::execute(
-        FrameGraphResources const& resources, backend::DriverApi& driver) noexcept {
-    base->execute(resources, driver);
+void RenderPassNode::execute(FrameGraphResources const& resources,
+        backend::DriverApi& driver) noexcept {
+
+    FrameGraph& fg = mFrameGraph;
+    ResourceAllocatorInterface& resourceAllocator = fg.getResourceAllocator();
+
+    // create the render targets
+    for (auto& rt : mRenderTargetData) {
+        assert(any(rt.targetBufferFlags));
+
+        backend::TargetBufferInfo info[6] = {};
+        for (size_t i = 0; i < 6; i++) {
+            if (rt.attachmentInfo[i].isValid()) {
+                auto const* pResource = static_cast<Resource<Texture> const*>(
+                        fg.getResource(rt.attachmentInfo[i]));
+                info[i].handle = pResource->resource.texture;
+                info[i].level  = pResource->subResourceDescriptor.level;
+                info[i].layer  = pResource->subResourceDescriptor.layer;
+            }
+        }
+
+        // TODO: handle special case for imported render target
+
+        rt.backend.target = resourceAllocator.createRenderTarget(
+                rt.name, rt.targetBufferFlags,
+                rt.backend.params.viewport.width,
+                rt.backend.params.viewport.height,
+                rt.descriptor.samples,
+                { info[0], info[1], info[2], info[3] },
+                info[4], info[5]);
+    }
+
+    mPassExecutor->execute(resources, driver);
+
+    // destroy the render targets
+    for (auto& rt : mRenderTargetData) {
+        resourceAllocator.destroyRenderTarget(rt.backend.target);
+    }
 }
 
 RenderTarget RenderPassNode::declareRenderTarget(FrameGraph& fg, FrameGraph::Builder& builder,
-        RenderTarget::Descriptor const& descriptor) noexcept {
+        const char* name, RenderTarget::Descriptor const& descriptor) noexcept {
 
     RenderTargetData data;
+    data.name = name;
     data.descriptor = descriptor;
     RenderTarget::Attachments& attachments = data.descriptor.attachments;
 
+    const Texture::Usage usages[6] = {
+            Texture::Usage::COLOR_ATTACHMENT,
+            Texture::Usage::COLOR_ATTACHMENT,
+            Texture::Usage::COLOR_ATTACHMENT,
+            Texture::Usage::COLOR_ATTACHMENT,
+            Texture::Usage::DEPTH_ATTACHMENT,
+            Texture::Usage::STENCIL_ATTACHMENT
+    };
+
     // retrieve the ResourceNode of the attachments coming to us -- this will be used later
     // to compute the discard flags.
-    for (size_t i = 0; i < 4; i++) {
-        if (descriptor.attachments.color[i].isValid()) {
-            data.incoming[i] = fg.getResourceNode(attachments.color[i]);
-            attachments.color[i] = builder.write(attachments.color[i],
-                    Texture::Usage::COLOR_ATTACHMENT);
-            data.outgoing[i] = fg.getResourceNode(attachments.color[i]);
-        }
-    }
-    if (descriptor.attachments.depth.isValid()) {
-        data.incoming[4] = fg.getResourceNode(attachments.depth);
-        attachments.depth = builder.write(attachments.depth,
-                Texture::Usage::DEPTH_ATTACHMENT);
-        data.outgoing[4] = fg.getResourceNode(attachments.depth);
-    }
-    if (descriptor.attachments.stencil.isValid()) {
-        data.incoming[5] = fg.getResourceNode(attachments.stencil);
-        attachments.stencil = builder.write(attachments.stencil,
-                Texture::Usage::STENCIL_ATTACHMENT);
-        data.outgoing[5] = fg.getResourceNode(attachments.stencil);
-    }
-
     for (size_t i = 0; i < 6; i++) {
-        // if the outgoing node is the same than the incoming node, it means we in fact
-        // didn't have a incoming node (the node was created but not used yet).
-        if (data.outgoing[i] == data.incoming[i]) {
-            data.incoming[i] = nullptr;
+        if (descriptor.attachments.array[i].isValid()) {
+            data.incoming[i] = fg.getResourceNode(attachments.array[i]);
+            attachments.color[i] = builder.write(attachments.array[i], usages[i]);
+            data.outgoing[i] = fg.getResourceNode(attachments.array[i]);
+            data.attachmentInfo[i] = attachments.array[i];
+            // if the outgoing node is the same than the incoming node, it means we in fact
+            // didn't have a incoming node (the node was created but not used yet).
+            if (data.outgoing[i] == data.incoming[i]) {
+                data.incoming[i] = nullptr;
+            }
         }
     }
 
@@ -89,8 +125,6 @@ RenderTarget RenderPassNode::declareRenderTarget(FrameGraph& fg, FrameGraph::Bui
 }
 
 void RenderPassNode::resolve() noexcept {
-    // calculate usage bits for our render targets
-
     using namespace backend;
 
     const backend::TargetBufferFlags flags[6] = {
@@ -103,23 +137,75 @@ void RenderPassNode::resolve() noexcept {
     };
 
     for (auto& rt : mRenderTargetData) {
+
+        uint32_t minWidth = std::numeric_limits<uint32_t>::max();
+        uint32_t minHeight = std::numeric_limits<uint32_t>::max();
+        uint32_t maxWidth = 0;
+        uint32_t maxHeight = 0;
+
+        /*
+         * Compute discard flags
+         */
         for (size_t i = 0; i < 6; i++) {
             // we use 'outgoing' has a proxy for 'do we have an attachment here?'
             if (rt.outgoing[i]) {
+                assert(rt.descriptor.attachments.array[i].isValid());
+
+                rt.targetBufferFlags |= flags[i];
+
                 // start by discarding all the attachments we have
                 // (we could set to ALL, but this is cleaner)
-                rt.params.flags.discardStart |= flags[i];
-                rt.params.flags.discardEnd   |= flags[i];
+                rt.backend.params.flags.discardStart |= flags[i];
+                rt.backend.params.flags.discardEnd   |= flags[i];
                 if (rt.outgoing[i]->hasActiveReaders()) {
-                    rt.params.flags.discardEnd &= ~flags[i];
+                    rt.backend.params.flags.discardEnd &= ~flags[i];
                 }
                 if (rt.incoming[i] && rt.incoming[i]->hasWriter()) {
-                    rt.params.flags.discardStart &= ~flags[i];
+                    rt.backend.params.flags.discardStart &= ~flags[i];
                 }
+
+                VirtualResource* pResource = mFrameGraph.getResource(rt.descriptor.attachments.array[i]);
+                Resource<Texture>* pTextureResource = static_cast<Resource<Texture>*>(pResource);
+
+                // update attachment sample count if not specified and usage permits it
+                if (!rt.descriptor.samples &&
+                    none(pTextureResource->usage & backend::TextureUsage::SAMPLEABLE)) {
+                    pTextureResource->descriptor.samples = rt.descriptor.samples;
+                }
+
+                // figure out the min/max dimensions across all attachments
+                const size_t level = pTextureResource->subResourceDescriptor.level;
+                const uint32_t w = FTexture::valueForLevel(level, pTextureResource->descriptor.width);
+                const uint32_t h = FTexture::valueForLevel(level, pTextureResource->descriptor.height);
+                minWidth = std::min(minWidth, w);
+                maxWidth = std::max(maxWidth, w);
+                minHeight = std::min(minHeight, h);
+                maxHeight = std::max(maxHeight, h);
             }
             // additionally, clear implies discardStart
-            rt.params.flags.discardStart |= rt.params.flags.clear;
+            rt.backend.params.flags.discardStart |= (
+                    rt.descriptor.clearFlags & rt.targetBufferFlags);
         }
+
+        assert(any(rt.targetBufferFlags));
+
+        // of all attachments size matches there are no ambiguity about the RT size.
+        // if they don't match however, we select a size that will accommodate all attachments.
+        uint32_t width = maxWidth;
+        uint32_t height = maxHeight;
+
+        // Update the descriptor if no size was specified (auto mode)
+        if (!rt.descriptor.viewport.width) {
+            rt.descriptor.viewport.width = width;
+        }
+        if (!rt.descriptor.viewport.height) {
+            rt.descriptor.viewport.height = height;
+        }
+
+        rt.backend.params.clearColor = rt.descriptor.clearColor;
+        rt.backend.params.flags.clear = (rt.descriptor.clearFlags & rt.targetBufferFlags);
+        rt.backend.params.viewport = rt.descriptor.viewport;
+        rt.descriptor.samples = rt.descriptor.samples;
     }
 }
 
@@ -145,9 +231,9 @@ utils::CString RenderPassNode::graphvizify() const noexcept {
 
     for (auto const& rt :mRenderTargetData) {
         s.append("\\nS:");
-        s.append(utils::to_string(rt.params.flags.discardStart).c_str());
+        s.append(utils::to_string(rt.backend.params.flags.discardStart).c_str());
         s.append(", E:");
-        s.append(utils::to_string(rt.params.flags.discardEnd).c_str());
+        s.append(utils::to_string(rt.backend.params.flags.discardEnd).c_str());
     }
 
     s.append("\", ");
@@ -162,7 +248,7 @@ utils::CString RenderPassNode::graphvizify() const noexcept {
 // ------------------------------------------------------------------------------------------------
 
 PresentPassNode::PresentPassNode(FrameGraph& fg) noexcept
-        : PassNode(fg.getGraph()) {
+        : PassNode(fg) {
 }
 PresentPassNode::PresentPassNode(PresentPassNode&& rhs) noexcept = default;
 PresentPassNode::~PresentPassNode() noexcept = default;

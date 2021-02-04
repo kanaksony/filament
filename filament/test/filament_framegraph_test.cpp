@@ -632,6 +632,9 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 auto rp = resources.getRenderPassInfo();
                 EXPECT_EQ(rp.params.flags.discardStart, TargetBufferFlags::DEPTH);
                 EXPECT_EQ(rp.params.flags.discardEnd, TargetBufferFlags::NONE);
+                EXPECT_EQ(rp.params.viewport.width, 16);
+                EXPECT_EQ(rp.params.viewport.height, 32);
+                EXPECT_TRUE((bool)rp.target);
             });
 
     struct GBufferPassData {
@@ -647,7 +650,7 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 data.gbuf1 = builder.create<Texture>("Gbuffer 1", desc);
                 data.gbuf2 = builder.create<Texture>("Gbuffer 2", desc);
                 data.gbuf3 = builder.create<Texture>("Gbuffer 3", desc);
-                auto rt = builder.useAsRenderTarget({ .attachments = {
+                auto rt = builder.useAsRenderTarget("Gbuffer target", { .attachments = {
                                 .color = { data.gbuf1, data.gbuf2, data.gbuf3 },
                                 .depth = data.depth
                         }});
@@ -671,6 +674,9 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                         | TargetBufferFlags::COLOR1
                         | TargetBufferFlags::COLOR2);
                 EXPECT_EQ(rp.params.flags.discardEnd, TargetBufferFlags::COLOR0);
+                EXPECT_EQ(rp.params.viewport.width, 16);
+                EXPECT_EQ(rp.params.viewport.height, 32);
+                EXPECT_TRUE((bool)rp.target);
             });
 
     struct LightingPassData {
@@ -704,6 +710,9 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 auto rp = resources.getRenderPassInfo();
                 EXPECT_EQ(rp.params.flags.discardStart,TargetBufferFlags::COLOR0);
                 EXPECT_EQ(rp.params.flags.discardEnd, TargetBufferFlags::NONE);
+                EXPECT_EQ(rp.params.viewport.width, 16);
+                EXPECT_EQ(rp.params.viewport.height, 32);
+                EXPECT_TRUE((bool)rp.target);
             });
 
     struct DebugPass {
@@ -730,6 +739,8 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 EXPECT_TRUE((bool)gbuf1.texture);
                 EXPECT_TRUE((bool)gbuf2.texture);
                 EXPECT_TRUE((bool)gbuf3.texture);
+                auto rp = resources.getRenderPassInfo();
+                EXPECT_FALSE((bool)rp.target);
             });
 
     struct PostPassData {
@@ -773,6 +784,9 @@ TEST_F(FrameGraphTest, FG2Complexe) {
                 auto rp = resources.getRenderPassInfo();
                 EXPECT_EQ(rp.params.flags.discardStart,TargetBufferFlags::COLOR0);
                 EXPECT_EQ(rp.params.flags.discardEnd, TargetBufferFlags::NONE);
+                EXPECT_EQ(rp.params.viewport.width, 16);
+                EXPECT_EQ(rp.params.viewport.height, 32);
+                EXPECT_TRUE((bool)rp.target);
             });
 
     fg.present(postPass->backBuffer);

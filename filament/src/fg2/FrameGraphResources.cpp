@@ -37,7 +37,7 @@ FrameGraphResources::RenderPassInfo FrameGraphResources::getRenderPassInfo(
     // this cast is safe because this can only be called from a RenderPassNode
     RenderPassNode const& renderPassNode = static_cast<RenderPassNode const&>(mPassNode);
     RenderPassNode::RenderTargetData const& rt = renderPassNode.getRenderTargetData(id);
-    return { rt.target, rt.params };
+    return { rt.backend.target, rt.backend.params };
 }
 
 } // namespace filament::fg2

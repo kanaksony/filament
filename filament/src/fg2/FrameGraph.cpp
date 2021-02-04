@@ -36,20 +36,28 @@ void FrameGraph::Builder::sideEffect() noexcept {
     mPass.makeTarget();
 }
 
-RenderTarget FrameGraph::Builder::useAsRenderTarget(RenderTarget::Descriptor const& desc) noexcept {
+const char* FrameGraph::Builder::getName(FrameGraphHandle handle) const noexcept {
+    return mFrameGraph.getResource(handle)->name;
+}
+
+RenderTarget FrameGraph::Builder::useAsRenderTarget(const char* name,
+        RenderTarget::Descriptor const& desc) noexcept {
     // it's safe here to cast to RenderPassNode because we can't be here for a PresentPassNode
     // also only RenderPassNodes have the concept of render targets.
-    return static_cast<RenderPassNode&>(mPass).declareRenderTarget(mFrameGraph, *this, desc);
+    return static_cast<RenderPassNode&>(mPass).declareRenderTarget(mFrameGraph, *this, name, desc);
 }
 
 uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>* color) noexcept {
-    auto[attachments, id] = useAsRenderTarget({ .attachments = { .color = { *color }}});
+    assert(color);
+    auto[attachments, id] = useAsRenderTarget(getName(*color),
+            { .attachments = { .color = { *color }}});
     *color = attachments.color[0];
     return id;
 }
 
 uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>* color,
         FrameGraphId<Texture>* depth) noexcept {
+    assert(color || depth);
     RenderTarget::Descriptor desc;
     if (color) {
         desc.attachments.color[0] = *color;
@@ -57,7 +65,7 @@ uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>* color,
     if (depth) {
         desc.attachments.depth = *depth;
     }
-    auto[attachments, id] = useAsRenderTarget(desc);
+    auto[attachments, id] = useAsRenderTarget(getName(color ? *color : *depth), desc);
     if (color) {
         *color = attachments.color[0];
     }
@@ -143,13 +151,11 @@ void FrameGraph::execute(backend::DriverApi& driver) noexcept {
                 }
             }
 
-            // TODO: create declared render targets
-
             // call execute
             FrameGraphResources resources(*this, *node);
             node->execute(resources, driver);
 
-            // TODO: destroy declared render targets
+            // destroy declared render targets
 
             // destroy resourcesList
             for (auto& pResource : resourcesList) {

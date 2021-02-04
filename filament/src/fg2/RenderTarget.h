@@ -31,9 +31,14 @@ namespace filament::fg2 {
  */
 struct RenderTarget {
     struct Attachments {
-        FrameGraphId<Texture> color[4] = {};
-        FrameGraphId<Texture> depth{};
-        FrameGraphId<Texture> stencil{};
+        union {
+            FrameGraphId<Texture> array[6] = {};
+            struct {
+                FrameGraphId<Texture> color[4];
+                FrameGraphId<Texture> depth;
+                FrameGraphId<Texture> stencil;
+            };
+        };
     };
 
     struct Descriptor {

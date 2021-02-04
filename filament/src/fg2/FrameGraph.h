@@ -59,45 +59,55 @@ public:
          * useAsRenderTarget() implies a write(). If a read() is also needed, it must be
          * issued separately before calling useAsRenderTarget().
          *
-         * @param desc descriptor for the render target
-         * @return a RenderTarget structure containing the new subresource handles as well as an
-         *         id to retrieve the concrete render target in the execute phase.
+         * @param name  A pointer to a null terminated string.
+         *              The pointer lifetime must extend beyond execute()
+         * @param desc  Descriptor for the render target.
+         * @return      A RenderTarget structure containing the new subresource handles as well as
+         *              an id to retrieve the concrete render target in the execute phase.
          */
-        RenderTarget useAsRenderTarget(RenderTarget::Descriptor const& desc) noexcept;
+        RenderTarget useAsRenderTarget(const char* name,
+                RenderTarget::Descriptor const& desc) noexcept;
 
         /**
          * Helper to easily declare a render target with a single color attachment.
          * This is equivalent to:
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-         *      auto [attachments, id] = useAsRenderTarget({.attachments={.color={color}}});
-         *      color = attachments.color[0];
+         *      auto [attachments, id] = useAsRenderTarget(getName(*color),
+         *              {.attachments = {.color = {*color}}});
+         *      *color = attachments.color[0];
          *      return id;
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
          *
          * @param color color attachment subresource
          * @return the id of this Render Target
          */
-        uint32_t useAsRenderTarget(FrameGraphId <Texture>* color) noexcept;
+        uint32_t useAsRenderTarget(FrameGraphId<Texture>* color) noexcept;
 
         /**
          * Helper to easily declare a render target with a color and depth attachment.
          * This is equivalent to:
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-         *      auto [attachments, id] = useAsRenderTarget({.attachments={.color={color}, .depth=depth}});
-         *      color = attachments.color[0];
-         *      depth = attachments.depth;
+         *      auto [attachments, id] = useAsRenderTarget(getName(color ? *color : *depth),
+         *              {.attachments = {.color = {*color}, .depth = *depth}});
+         *      *color = attachments.color[0];
+         *      *depth = attachments.depth;
          *      return id;
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-         * @param color color attachment subresource
+         * Either color or depth must be non-null.
+         *
+         * @param color color attachment subresource, can be null
+         * @param depth depth attachment subresource, can be null
          * @return the id of this Render Target
          */
-        uint32_t useAsRenderTarget(FrameGraphId <Texture>* color, FrameGraphId <Texture>* depth) noexcept;
+        uint32_t useAsRenderTarget(FrameGraphId<Texture>* color,
+                FrameGraphId<Texture>* depth) noexcept;
 
 
         /**
          * Creates a virtual resource of type RESOURCE
          * @tparam RESOURCE Type of the resource to create
-         * @param name      Name of the resource
+         * @param name      A pointer to a null terminated string.
+         *                  The pointer lifetime must extend beyond execute().
          * @param desc      Descriptor for this resources
          * @return          A typed resource handle
          */
@@ -160,6 +170,12 @@ public:
         template<typename RESOURCE>
         inline typename RESOURCE::Descriptor const& getDescriptor(FrameGraphId<RESOURCE> handle) const;
 
+        /**
+         * Retrieves the name of a resource
+         * @param handle    Handle to a virtual resource
+         * @return          C string to the name of the resource
+         */
+        const char* getName(FrameGraphHandle handle) const noexcept;
     private:
         friend class FrameGraph;
         Builder(FrameGraph& fg, PassNode& pass) noexcept;
@@ -281,20 +297,20 @@ public:
     FrameGraphId<Texture> import(const char* name, const Texture::Descriptor& desc,
             backend::Handle<backend::HwRenderTarget> target);
 
-    // no user serviceable parts below
-    LinearAllocatorArena& getArena() noexcept { return mArena; }
-    DependencyGraph& getGraph() noexcept { return mGraph; }
-
 private:
     friend class FrameGraphResources;
+    friend class PassNode;
     friend class ResourceNode;
     friend class RenderPassNode;
+
+    LinearAllocatorArena& getArena() noexcept { return mArena; }
+    DependencyGraph& getGraph() noexcept { return mGraph; }
+    ResourceAllocatorInterface& getResourceAllocator() noexcept { return mResourceAllocator; }
 
     struct ResourceSlot {
         int16_t rid;    // VirtualResource* index
         int16_t nid;    // ResourceNode* index
     };
-
     void reset() noexcept;
     void addPresentPass(std::function<void(Builder&)> setup) noexcept;
     Builder addPassInternal(const char* name, PassExecutor* base) noexcept;
@@ -407,7 +423,6 @@ typename RESOURCE::Descriptor const& FrameGraph::Builder::getDescriptor(
         FrameGraphId<RESOURCE> handle) const {
     return static_cast<Resource<RESOURCE> const*>(mFrameGraph.getResource(handle))->descriptor;
 }
-
 
 } // namespace fg2
 } // namespace filament
