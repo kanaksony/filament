@@ -379,11 +379,6 @@ private:
 
     // TODO: not sure that we need unique_ptr<>, it might be enough to just free the
     //       objects in the dtor and in reset(). We can fix that later.
-    // TODO: we need pointers here because we keep pointers to PassNode and ResourceNode
-    //       in various places. If we could guarantee the vectors
-    //       couldn't move (by having a max size for each), we could get away with
-    //       vector<Foo> instead of vector<Foo*>. An alternative would be to
-    //       use indices everywhere.
     Vector<ResourceSlot> mResourceSlots;
     Vector<UniquePtr<VirtualResource>> mResources;
     Vector<UniquePtr<ResourceNode>> mResourceNodes;
@@ -412,14 +407,15 @@ void FrameGraph::present(FrameGraphId<RESOURCE> input) {
 template<typename RESOURCE>
 FrameGraphId<RESOURCE> FrameGraph::create(char const* name,
         typename RESOURCE::Descriptor const& desc) noexcept {
-    UniquePtr<VirtualResource> resource(mArena.make<Resource<RESOURCE>>(name, desc, mResources.size()), mArena);
-    return FrameGraphId<RESOURCE>(addResourceInternal(std::move(resource)));
+    UniquePtr<VirtualResource> vresource(mArena.make<Resource<RESOURCE>>(name, desc, mResources.size()), mArena);
+    return FrameGraphId<RESOURCE>(addResourceInternal(std::move(vresource)));
 }
 
 template<typename RESOURCE>
 FrameGraphId<RESOURCE> FrameGraph::import(char const* name, typename RESOURCE::Descriptor const& desc,
         RESOURCE const& resource) noexcept {
-    return FrameGraphId<RESOURCE>();
+    UniquePtr<VirtualResource> vresource(mArena.make<ImportedResource<RESOURCE>>(name, desc, resource, mResources.size()), mArena);
+    return FrameGraphId<RESOURCE>(addResourceInternal(std::move(vresource)));
 }
 
 template<typename RESOURCE>

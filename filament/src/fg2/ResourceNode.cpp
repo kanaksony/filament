@@ -83,7 +83,7 @@ utils::CString ResourceNode::graphvizify() const noexcept {
     s.append(std::to_string(id));
     s.append("\\nversion: ");
     s.append(std::to_string(pResource->version));
-    if (pResource->imported) {
+    if (pResource->isImported()) {
         s.append(", imported");
     }
     s.append("\\nusage: ");

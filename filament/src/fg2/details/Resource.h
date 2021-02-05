@@ -37,7 +37,6 @@ public:
     // constants
     const char* const name;
     const uint16_t id; // for debugging and graphing
-    bool imported = false;
 
     // updated by builder
     FrameGraphHandle::Version version = 0;
@@ -73,6 +72,8 @@ public:
     virtual void destroyEdge(DependencyGraph::Edge* edge) noexcept = 0;
 
     virtual utils::CString usageString() const noexcept = 0;
+
+    virtual bool isImported() const noexcept { return false; }
 
 protected:
     void addOutgoingEdge(ResourceNode* node, DependencyGraph::Edge* edge) noexcept;
@@ -174,6 +175,30 @@ private:
     utils::CString usageString() const noexcept override {
         return utils::to_string(usage);
     }
+};
+
+/*
+ * An imported resource is just like a regular one, except that it's constructed directly from
+ * the concrete resource and it, evidently, doesn't create/destroy the concrete resource.
+ */
+template<typename RESOURCE>
+class ImportedResource : public Resource<RESOURCE> {
+public:
+    using Descriptor = typename RESOURCE::Descriptor;
+    ImportedResource(const char* name, Descriptor const& desc, RESOURCE const& rsrc, uint16_t id) noexcept
+            : Resource<RESOURCE>(name, desc, id) {
+        this->resource = rsrc;
+    }
+
+private:
+    void devirtualize(ResourceAllocatorInterface&) noexcept override {
+        // imported resources don't need to devirtualize
+    }
+    void destroy(ResourceAllocatorInterface&) noexcept override {
+        // imported resources never destroy the concrete resource
+    }
+
+    bool isImported() const noexcept override { return true; }
 };
 
 

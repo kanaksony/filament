@@ -181,11 +181,6 @@ void FrameGraph::execute(backend::DriverApi& driver) noexcept {
     reset();
 }
 
-FrameGraphId<Texture> FrameGraph::import(char const* name, Texture::Descriptor const& desc,
-        backend::Handle<backend::HwRenderTarget> target) {
-    return FrameGraphId<Texture>();
-}
-
 void FrameGraph::addPresentPass(std::function<void(FrameGraph::Builder&)> setup) noexcept {
     PresentPassNode* node = mArena.make<PresentPassNode>(*this);
     mPassNodes.emplace_back(node, mArena);
