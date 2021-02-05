@@ -50,9 +50,11 @@ public:
 
 class RenderPassNode : public PassNode {
 public:
-    struct RenderTargetData {
+    class RenderTargetData {
+    public:
         const char* name = {};
         RenderTarget::Descriptor descriptor;
+        bool imported = false;
         backend::TargetBufferFlags targetBufferFlags = {};
         FrameGraphId<Texture> attachmentInfo[6] = {};
         ResourceNode* incoming[6] = {};  // nodes of the incoming attachments
@@ -61,6 +63,9 @@ public:
             backend::Handle<backend::HwRenderTarget> target;
             backend::RenderPassParams params;
         } backend;
+
+        void devirtualize(FrameGraph& fg, ResourceAllocatorInterface& resourceAllocator) noexcept;
+        void destroy(ResourceAllocatorInterface& resourceAllocator) noexcept;
     };
 
     RenderPassNode(FrameGraph& fg, const char* name, PassExecutor* base) noexcept;

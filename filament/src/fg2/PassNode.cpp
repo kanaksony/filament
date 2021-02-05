@@ -54,35 +54,14 @@ void RenderPassNode::execute(FrameGraphResources const& resources,
 
     // create the render targets
     for (auto& rt : mRenderTargetData) {
-        assert(any(rt.targetBufferFlags));
-
-        backend::TargetBufferInfo info[6] = {};
-        for (size_t i = 0; i < 6; i++) {
-            if (rt.attachmentInfo[i].isValid()) {
-                auto const* pResource = static_cast<Resource<Texture> const*>(
-                        fg.getResource(rt.attachmentInfo[i]));
-                info[i].handle = pResource->resource.texture;
-                info[i].level  = pResource->subResourceDescriptor.level;
-                info[i].layer  = pResource->subResourceDescriptor.layer;
-            }
-        }
-
-        // TODO: handle special case for imported render target
-
-        rt.backend.target = resourceAllocator.createRenderTarget(
-                rt.name, rt.targetBufferFlags,
-                rt.backend.params.viewport.width,
-                rt.backend.params.viewport.height,
-                rt.descriptor.samples,
-                { info[0], info[1], info[2], info[3] },
-                info[4], info[5]);
+        rt.devirtualize(fg, resourceAllocator);
     }
 
     mPassExecutor->execute(resources, driver);
-
+    
     // destroy the render targets
     for (auto& rt : mRenderTargetData) {
-        resourceAllocator.destroyRenderTarget(rt.backend.target);
+        rt.destroy(resourceAllocator);
     }
 }
 
@@ -116,6 +95,17 @@ RenderTarget RenderPassNode::declareRenderTarget(FrameGraph& fg, FrameGraph::Bui
             if (data.outgoing[i] == data.incoming[i]) {
                 data.incoming[i] = nullptr;
             }
+        }
+    }
+
+    // Handle our special imported render target
+    if (attachments.color[0].isValid()) {
+        VirtualResource* pResource = fg.getResource(attachments.color[0]);
+        ImportedRenderTarget* pImportedRenderTarget = pResource->asImportedRenderTarget();
+        if (pImportedRenderTarget) {
+            data.imported = true;
+            data.descriptor = pImportedRenderTarget->rtdesc;
+            data.backend.target = pImportedRenderTarget->target;
         }
     }
 
@@ -206,6 +196,39 @@ void RenderPassNode::resolve() noexcept {
         rt.backend.params.flags.clear = (rt.descriptor.clearFlags & rt.targetBufferFlags);
         rt.backend.params.viewport = rt.descriptor.viewport;
         rt.descriptor.samples = rt.descriptor.samples;
+    }
+}
+
+void RenderPassNode::RenderTargetData::devirtualize(FrameGraph& fg,
+        ResourceAllocatorInterface& resourceAllocator) noexcept {
+    assert(any(targetBufferFlags));
+    if (UTILS_LIKELY(!imported)) {
+
+        backend::TargetBufferInfo info[6] = {};
+        for (size_t i = 0; i < 6; i++) {
+            if (attachmentInfo[i].isValid()) {
+                auto const* pResource = static_cast<Resource<Texture> const*>(
+                        fg.getResource(attachmentInfo[i]));
+                info[i].handle = pResource->resource.texture;
+                info[i].level = pResource->subResourceDescriptor.level;
+                info[i].layer = pResource->subResourceDescriptor.layer;
+            }
+        }
+
+        backend.target = resourceAllocator.createRenderTarget(
+                name, targetBufferFlags,
+                backend.params.viewport.width,
+                backend.params.viewport.height,
+                descriptor.samples,
+                { info[0], info[1], info[2], info[3] },
+                info[4], info[5]);
+    }
+}
+
+void RenderPassNode::RenderTargetData::destroy(
+        ResourceAllocatorInterface& resourceAllocator) noexcept {
+    if (UTILS_LIKELY(!imported)) {
+        resourceAllocator.destroyRenderTarget(backend.target);
     }
 }
 

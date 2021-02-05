@@ -18,6 +18,8 @@
 #define TNT_FILAMENT_FG2_RESOURCE_H
 
 #include "fg2/FrameGraphId.h"
+#include "fg2/Texture.h"
+#include "fg2/RenderTarget.h"
 #include "fg2/details/DependencyGraph.h"
 
 namespace filament {
@@ -28,6 +30,7 @@ namespace filament::fg2 {
 
 class PassNode;
 class ResourceNode;
+class ImportedRenderTarget;
 
 /*
  * ResourceEdgeBase only exists to enforce type safety
@@ -75,12 +78,15 @@ public:
     /* Destroy the concrete resource */
     virtual void destroy(ResourceAllocatorInterface& resourceAllocator) noexcept = 0;
 
-    /** Destroy an Edge instantiated by this resource */
+    /* Destroy an Edge instantiated by this resource */
     virtual void destroyEdge(DependencyGraph::Edge* edge) noexcept = 0;
 
     virtual utils::CString usageString() const noexcept = 0;
 
     virtual bool isImported() const noexcept { return false; }
+
+    // this is to workaround our lack of RTTI -- otherwise we could use dynamic_cast
+    virtual ImportedRenderTarget* asImportedRenderTarget() noexcept { return nullptr; }
 
 protected:
     void addOutgoingEdge(ResourceNode* node, ResourceEdgeBase* edge) noexcept;
@@ -130,22 +136,26 @@ public:
     ~Resource() noexcept = default;
 
     // pass Node to resource Node edge (a write to)
-    void connect(DependencyGraph& graph,
+    virtual bool connect(DependencyGraph& graph,
             PassNode* passNode, ResourceNode* resourceNode, Usage u) noexcept {
         auto* edge = new ResourceEdge(graph,
                 toDependencyGraphNode(passNode), toDependencyGraphNode(resourceNode), u);
         setIncomingEdge(resourceNode, edge);
+        // TODO: we should check that usage flags are correct (e.g. a write flag is not used for reading)
+        return true;
     }
 
     // resource Node to pass Node edge (a read from)
-    void connect(DependencyGraph& graph,
+    virtual bool connect(DependencyGraph& graph,
             ResourceNode* resourceNode, PassNode* passNode, Usage u) noexcept {
         auto* edge = new ResourceEdge(graph,
                 toDependencyGraphNode(resourceNode), toDependencyGraphNode(passNode), u);
         addOutgoingEdge(resourceNode, edge);
+        // TODO: we should check that usage flags are correct (e.g. a write flag is not used for reading)
+        return true;
     }
 
-private:
+protected:
     /*
      * The virtual below must be in a header file as RESOURCE is only known at compile time
      */
@@ -206,6 +216,28 @@ private:
     }
 
     bool isImported() const noexcept override { return true; }
+};
+
+
+class ImportedRenderTarget : public ImportedResource<Texture> {
+public:
+    backend::Handle<backend::HwRenderTarget> target;
+    RenderTarget::Descriptor rtdesc;
+
+    using Descriptor = Texture::Descriptor;
+    ImportedRenderTarget(const char* name, Descriptor const& tdesc,
+            RenderTarget::Descriptor const& desc,
+            backend::Handle<backend::HwRenderTarget> target);
+
+    ~ImportedRenderTarget() noexcept override;
+
+    bool connect(DependencyGraph& graph, PassNode* passNode, ResourceNode* resourceNode,
+            Texture::Usage u) noexcept override;
+
+    bool connect(DependencyGraph& graph, ResourceNode* resourceNode, PassNode* passNode,
+            Texture::Usage u) noexcept override;
+
+    ImportedRenderTarget* asImportedRenderTarget() noexcept override { return this; }
 };
 
 

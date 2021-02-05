@@ -19,6 +19,8 @@
 #include "fg2/details/PassNode.h"
 #include "fg2/details/ResourceNode.h"
 
+#include <utils/Panic.h>
+
 namespace filament::fg2 {
 
 VirtualResource::~VirtualResource() noexcept = default;
@@ -49,6 +51,36 @@ void VirtualResource::neededByPass(PassNode* pNode) noexcept {
     first = first ? first : pNode;
     // figure out which is the last pass to need this resource
     last = pNode;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+ImportedRenderTarget::~ImportedRenderTarget() noexcept = default;
+
+ImportedRenderTarget::ImportedRenderTarget(char const* name,
+        ImportedRenderTarget::Descriptor const& tdesc, RenderTarget::Descriptor const& desc,
+        backend::Handle<backend::HwRenderTarget> target)
+            : ImportedResource<Texture>(name, tdesc,{}), target(target), rtdesc(desc) {
+}
+
+bool ImportedRenderTarget::connect(DependencyGraph& graph, PassNode* passNode,
+        ResourceNode* resourceNode, backend::TextureUsage u) noexcept {
+    // pass Node to resource Node edge (a write to)
+    if (!ASSERT_PRECONDITION_NON_FATAL(any(u & Texture::Usage::COLOR_ATTACHMENT),
+            "Imported render target resource can only be used as a COLOR_ATTACHMENT")) {
+        return false;
+    }
+    return Resource::connect(graph, passNode, resourceNode, u);
+}
+
+bool ImportedRenderTarget::connect(DependencyGraph& graph, ResourceNode* resourceNode,
+        PassNode* passNode, backend::TextureUsage u) noexcept {
+    // resource Node to pass Node edge (a read from)
+    if (!ASSERT_PRECONDITION_NON_FATAL(any(u & Texture::Usage::COLOR_ATTACHMENT),
+            "Imported render target resource can only be used as a COLOR_ATTACHMENT")) {
+        return false;
+    }
+    return Resource::connect(graph, resourceNode, passNode, u);
 }
 
 } // namespace filament::fg2

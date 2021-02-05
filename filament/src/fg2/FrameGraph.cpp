@@ -257,6 +257,16 @@ FrameGraphHandle FrameGraph::writeInternal(FrameGraphHandle handle,
     return handle;
 }
 
+FrameGraphId<Texture> FrameGraph::import(char const* name, RenderTarget::Descriptor const& desc,
+        backend::Handle<backend::HwRenderTarget> target) {
+    UniquePtr<VirtualResource> vresource(
+            mArena.make<ImportedRenderTarget>(name,Texture::Descriptor{
+                            .width = desc.viewport.width,
+                            .height = desc.viewport.height,
+                    }, desc, target), mArena);
+    return FrameGraphId<Texture>(addResourceInternal(std::move(vresource)));
+}
+
 void FrameGraph::reset() noexcept {
     // the order of destruction is important here
     mPassNodes.clear();

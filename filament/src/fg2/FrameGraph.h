@@ -300,11 +300,11 @@ public:
      * will be the one passed as argument here, instead of being dynamically created.
      *
      * @param name      A name for the rendter target
-     * @param desc      Descriptor for the imported Texture
+     * @param desc      Descriptor for the imported render target
      * @param target    handle to the concrete render target to import
      * @return          A handle to a Texture
      */
-    FrameGraphId<Texture> import(const char* name, const Texture::Descriptor& desc,
+    FrameGraphId<Texture> import(const char* name, RenderTarget::Descriptor const& desc,
             backend::Handle<backend::HwRenderTarget> target);
 
 private:
@@ -423,6 +423,7 @@ FrameGraphId<RESOURCE> FrameGraph::read(PassNode& passNode, FrameGraphId<RESOURC
         typename RESOURCE::Usage usage) {
     ResourceNode* node;
     VirtualResource* vrsrc;
+    // TODO: ensure that we're not reading twice from the same pass
     FrameGraphId<RESOURCE> result(readInternal(input, &node, &vrsrc));
     if (result.isValid()) {
         Resource<RESOURCE>* resource = static_cast<Resource<RESOURCE> *>(vrsrc);
