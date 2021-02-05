@@ -27,6 +27,7 @@ class CString;
 namespace filament::fg2 {
 
 class FrameGraph;
+class ResourceEdgeBase;
 
 class ResourceNode : public DependencyGraph::Node {
 public:
@@ -36,8 +37,8 @@ public:
     ResourceNode(ResourceNode const&) = delete;
     ResourceNode& operator=(ResourceNode const&) = delete;
 
-    void addOutgoingEdge(DependencyGraph::Edge* edge) noexcept;
-    void setIncomingEdge(DependencyGraph::Edge* edge) noexcept;
+    void addOutgoingEdge(ResourceEdgeBase* edge) noexcept;
+    void setIncomingEdge(ResourceEdgeBase* edge) noexcept;
 
     // constants
     const FrameGraphHandle resourceHandle;
@@ -61,8 +62,8 @@ private:
 
 private:
     FrameGraph& mFrameGraph;
-    std::vector<DependencyGraph::Edge *> mReaders;
-    DependencyGraph::Edge* mWriter = nullptr;
+    std::vector<ResourceEdgeBase *> mReaders;
+    ResourceEdgeBase* mWriter = nullptr;
 };
 
 } // namespace filament::fg2

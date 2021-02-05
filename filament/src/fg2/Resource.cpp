@@ -23,11 +23,11 @@ namespace filament::fg2 {
 
 VirtualResource::~VirtualResource() noexcept = default;
 
-void VirtualResource::addOutgoingEdge(ResourceNode* node, DependencyGraph::Edge* edge) noexcept {
+void VirtualResource::addOutgoingEdge(ResourceNode* node, ResourceEdgeBase* edge) noexcept {
     node->addOutgoingEdge(edge);
 }
 
-void VirtualResource::setIncomingEdge(ResourceNode* node, DependencyGraph::Edge* edge) noexcept {
+void VirtualResource::setIncomingEdge(ResourceNode* node, ResourceEdgeBase* edge) noexcept {
     node->setIncomingEdge(edge);
 }
 

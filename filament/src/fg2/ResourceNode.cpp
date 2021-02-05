@@ -40,11 +40,11 @@ char const* ResourceNode::getName() const noexcept {
     return mFrameGraph.getResource(resourceHandle)->name;
 }
 
-void ResourceNode::addOutgoingEdge(DependencyGraph::Edge* edge) noexcept {
+void ResourceNode::addOutgoingEdge(ResourceEdgeBase* edge) noexcept {
     mReaders.push_back(edge);
 }
 
-void ResourceNode::setIncomingEdge(DependencyGraph::Edge* edge) noexcept {
+void ResourceNode::setIncomingEdge(ResourceEdgeBase* edge) noexcept {
     assert(mWriter == nullptr);
     mWriter = edge;
 }

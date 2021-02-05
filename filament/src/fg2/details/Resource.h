@@ -30,13 +30,20 @@ class PassNode;
 class ResourceNode;
 
 /*
+ * ResourceEdgeBase only exists to enforce type safety
+ */
+class ResourceEdgeBase : public DependencyGraph::Edge {
+public:
+    using DependencyGraph::Edge::Edge;
+};
+
+/*
  * The generic parts of virtual resources.
  */
 class VirtualResource {
 public:
     // constants
     const char* const name;
-    const uint16_t id; // for debugging and graphing
 
     // updated by builder
     FrameGraphHandle::Version version = 0;
@@ -46,7 +53,7 @@ public:
     PassNode* first = nullptr;  // pass that needs to instantiate the resource
     PassNode* last = nullptr;   // pass that can destroy the resource
 
-    VirtualResource(const char* name, uint16_t id) noexcept : name(name), id(id) { }
+    VirtualResource(const char* name) noexcept : name(name) { }
     VirtualResource(VirtualResource const&) = delete;
     VirtualResource& operator=(VirtualResource const&) = delete;
     virtual ~VirtualResource() noexcept;
@@ -59,8 +66,8 @@ public:
      * calculate its effective usage flags.
      */
     virtual void resolveUsage(DependencyGraph& graph,
-            DependencyGraph::Edge const* const* edges, size_t count,
-            DependencyGraph::Edge const* writer) noexcept = 0;
+            ResourceEdgeBase const* const* edges, size_t count,
+            ResourceEdgeBase const* writer) noexcept = 0;
 
     /* Instantiate the concrete resource */
     virtual void devirtualize(ResourceAllocatorInterface& resourceAllocator) noexcept = 0;
@@ -76,8 +83,8 @@ public:
     virtual bool isImported() const noexcept { return false; }
 
 protected:
-    void addOutgoingEdge(ResourceNode* node, DependencyGraph::Edge* edge) noexcept;
-    void setIncomingEdge(ResourceNode* node, DependencyGraph::Edge* edge) noexcept;
+    void addOutgoingEdge(ResourceNode* node, ResourceEdgeBase* edge) noexcept;
+    void setIncomingEdge(ResourceNode* node, ResourceEdgeBase* edge) noexcept;
     // these exist only so we don't have to include PassNode.h or ResourceNode.h
     static DependencyGraph::Node* toDependencyGraphNode(ResourceNode* node) noexcept;
     static DependencyGraph::Node* toDependencyGraphNode(PassNode* node) noexcept;
@@ -107,17 +114,17 @@ public:
     SubResourceDescriptor subResourceDescriptor;
 
     // An Edge with added data from this resource
-    class ResourceEdge : public DependencyGraph::Edge {
+    class ResourceEdge : public ResourceEdgeBase {
     public:
         Usage usage;
         ResourceEdge(DependencyGraph& graph,
                 DependencyGraph::Node* from, DependencyGraph::Node* to, Usage usage) noexcept
-                : DependencyGraph::Edge(graph, from, to), usage(usage) {
+                : ResourceEdgeBase(graph, from, to), usage(usage) {
         }
     };
 
-    Resource(const char* name, Descriptor const& desc, uint16_t id) noexcept
-        : VirtualResource(name, id), descriptor(desc) {
+    Resource(const char* name, Descriptor const& desc) noexcept
+        : VirtualResource(name), descriptor(desc) {
     }
 
     ~Resource() noexcept = default;
@@ -144,8 +151,8 @@ private:
      */
 
     void resolveUsage(DependencyGraph& graph,
-            DependencyGraph::Edge const* const* edges, size_t count,
-            DependencyGraph::Edge const* writer) noexcept override {
+            ResourceEdgeBase const* const* edges, size_t count,
+            ResourceEdgeBase const* writer) noexcept override {
         for (size_t i = 0; i < count; i++) {
             if (graph.isEdgeValid(edges[i])) {
                 // this Edge is guaranteed to be a ResourceEdge<RESOURCE> by construction
@@ -185,8 +192,8 @@ template<typename RESOURCE>
 class ImportedResource : public Resource<RESOURCE> {
 public:
     using Descriptor = typename RESOURCE::Descriptor;
-    ImportedResource(const char* name, Descriptor const& desc, RESOURCE const& rsrc, uint16_t id) noexcept
-            : Resource<RESOURCE>(name, desc, id) {
+    ImportedResource(const char* name, Descriptor const& desc, RESOURCE const& rsrc) noexcept
+            : Resource<RESOURCE>(name, desc) {
         this->resource = rsrc;
     }
 

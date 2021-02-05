@@ -407,14 +407,14 @@ void FrameGraph::present(FrameGraphId<RESOURCE> input) {
 template<typename RESOURCE>
 FrameGraphId<RESOURCE> FrameGraph::create(char const* name,
         typename RESOURCE::Descriptor const& desc) noexcept {
-    UniquePtr<VirtualResource> vresource(mArena.make<Resource<RESOURCE>>(name, desc, mResources.size()), mArena);
+    UniquePtr<VirtualResource> vresource(mArena.make<Resource<RESOURCE>>(name, desc), mArena);
     return FrameGraphId<RESOURCE>(addResourceInternal(std::move(vresource)));
 }
 
 template<typename RESOURCE>
 FrameGraphId<RESOURCE> FrameGraph::import(char const* name, typename RESOURCE::Descriptor const& desc,
         RESOURCE const& resource) noexcept {
-    UniquePtr<VirtualResource> vresource(mArena.make<ImportedResource<RESOURCE>>(name, desc, resource, mResources.size()), mArena);
+    UniquePtr<VirtualResource> vresource(mArena.make<ImportedResource<RESOURCE>>(name, desc, resource), mArena);
     return FrameGraphId<RESOURCE>(addResourceInternal(std::move(vresource)));
 }
 
