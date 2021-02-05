@@ -79,8 +79,16 @@ uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>* color,
 
 FrameGraph::FrameGraph(ResourceAllocatorInterface& resourceAllocator)
         : mResourceAllocator(resourceAllocator),
-          mArena("FrameGraph Arena", 131072)
+          mArena("FrameGraph Arena", 131072),
+          mResourceSlots(mArena),
+          mResources(mArena),
+          mResourceNodes(mArena),
+          mPassNodes(mArena)
 {
+    mResourceSlots.reserve(256);
+    mResources.reserve(256);
+    mResourceNodes.reserve(256);
+    mPassNodes.reserve(64);
 }
 
 FrameGraph::~FrameGraph() = default;
@@ -179,8 +187,8 @@ FrameGraphId<Texture> FrameGraph::import(char const* name, Texture::Descriptor c
 }
 
 void FrameGraph::addPresentPass(std::function<void(FrameGraph::Builder&)> setup) noexcept {
-    PresentPassNode* node = new PresentPassNode(*this);
-    mPassNodes.emplace_back(node);
+    PresentPassNode* node = mArena.make<PresentPassNode>(*this);
+    mPassNodes.emplace_back(node, mArena);
     Builder builder(*this, *node);
     setup(builder);
     builder.sideEffect();
@@ -188,18 +196,19 @@ void FrameGraph::addPresentPass(std::function<void(FrameGraph::Builder&)> setup)
 
 FrameGraph::Builder FrameGraph::addPassInternal(char const* name, PassExecutor* base) noexcept {
     // record in our pass list and create the builder
-    PassNode* node = new RenderPassNode(*this, name, base);
-    mPassNodes.emplace_back(node);
+    PassNode* node = mArena.make<RenderPassNode>(*this, name, base);
+    mPassNodes.emplace_back(node, mArena);
     return Builder(*this, *node);
 }
 
-FrameGraphHandle FrameGraph::addResourceInternal(VirtualResource* resource) noexcept {
+FrameGraphHandle FrameGraph::addResourceInternal(UniquePtr<VirtualResource> resource) noexcept {
     FrameGraphHandle handle(mResourceSlots.size());
     ResourceSlot& slot = mResourceSlots.emplace_back();
     slot.rid = mResources.size();
     slot.nid = mResourceNodes.size();
-    mResources.emplace_back(resource);
-    mResourceNodes.emplace_back(new ResourceNode(*this, handle));
+    mResources.push_back(std::move(resource));
+    ResourceNode* node = mArena.make<ResourceNode>(*this, handle);
+    mResourceNodes.emplace_back(node, mArena);
     return handle;
 }
 
@@ -244,8 +253,8 @@ FrameGraphHandle FrameGraph::writeInternal(FrameGraphHandle handle,
 
     // create new ResourceNodes
     slot.nid = mResourceNodes.size();
-    *pNode = new ResourceNode(*this, handle);
-    mResourceNodes.emplace_back(*pNode);
+    *pNode = mArena.make<ResourceNode>(*this, handle);
+    mResourceNodes.emplace_back(*pNode, mArena);
 
     // update version number in resource
     (*pResource)->version = handle.version;
