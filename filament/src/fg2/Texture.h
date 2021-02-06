@@ -38,7 +38,7 @@ namespace filament::fg2 {
  *      void destroy(ResourceAllocatorInterface&) noexcept;
  */
 struct Texture {
-    backend::Handle<backend::HwTexture> texture;
+    backend::Handle<backend::HwTexture> handle;
 
     /** describes a Texture resource */
     struct Descriptor {

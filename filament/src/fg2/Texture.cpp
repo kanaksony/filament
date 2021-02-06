@@ -22,15 +22,15 @@ namespace filament::fg2 {
 
 void Texture::create(ResourceAllocatorInterface& resourceAllocator, const char* name,
         Texture::Descriptor const& descriptor, Texture::Usage usage) noexcept {
-    texture = resourceAllocator.createTexture(name,
+    handle = resourceAllocator.createTexture(name,
             descriptor.type, descriptor.levels, descriptor.format, descriptor.samples,
             descriptor.width, descriptor.height, descriptor.depth,
             usage);
 }
 
 void Texture::destroy(ResourceAllocatorInterface& resourceAllocator) noexcept {
-    resourceAllocator.destroyTexture(texture);
-    texture.clear();
+    resourceAllocator.destroyTexture(handle);
+    handle.clear();
 }
 
 } // namespace filament::fg2

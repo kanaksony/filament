@@ -204,7 +204,7 @@ TEST_F(FrameGraphTest, Basic) {
             },
             [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
                 Texture const& depth = resources.get(data.depth);
-                EXPECT_TRUE((bool)depth.texture);
+                EXPECT_TRUE((bool)depth.handle);
                 auto rp = resources.getRenderPassInfo();
                 EXPECT_EQ(rp.params.flags.discardStart, TargetBufferFlags::DEPTH);
                 EXPECT_EQ(rp.params.flags.discardEnd, TargetBufferFlags::NONE);
@@ -243,10 +243,10 @@ TEST_F(FrameGraphTest, Basic) {
                 Texture const& gbuf1 = resources.get(data.gbuf1);
                 Texture const& gbuf2 = resources.get(data.gbuf2);
                 Texture const& gbuf3 = resources.get(data.gbuf3);
-                EXPECT_TRUE((bool)depth.texture);
-                EXPECT_TRUE((bool)gbuf1.texture);
-                EXPECT_TRUE((bool)gbuf2.texture);
-                EXPECT_TRUE((bool)gbuf3.texture);
+                EXPECT_TRUE((bool)depth.handle);
+                EXPECT_TRUE((bool)gbuf1.handle);
+                EXPECT_TRUE((bool)gbuf2.handle);
+                EXPECT_TRUE((bool)gbuf3.handle);
                 auto rp = resources.getRenderPassInfo();
                 EXPECT_EQ(rp.params.flags.discardStart,
                         TargetBufferFlags::COLOR0
@@ -281,11 +281,11 @@ TEST_F(FrameGraphTest, Basic) {
                 Texture const& gbuf1 = resources.get(data.gbuf1);
                 Texture const& gbuf2 = resources.get(data.gbuf2);
                 Texture const& gbuf3 = resources.get(data.gbuf3);
-                EXPECT_TRUE((bool)lightingBuffer.texture);
-                EXPECT_TRUE((bool)depth.texture);
-                EXPECT_FALSE((bool)gbuf1.texture);
-                EXPECT_TRUE((bool)gbuf2.texture);
-                EXPECT_TRUE((bool)gbuf3.texture);
+                EXPECT_TRUE((bool)lightingBuffer.handle);
+                EXPECT_TRUE((bool)depth.handle);
+                EXPECT_FALSE((bool)gbuf1.handle);
+                EXPECT_TRUE((bool)gbuf2.handle);
+                EXPECT_TRUE((bool)gbuf3.handle);
                 auto rp = resources.getRenderPassInfo();
                 EXPECT_EQ(rp.params.flags.discardStart,TargetBufferFlags::COLOR0);
                 EXPECT_EQ(rp.params.flags.discardEnd, TargetBufferFlags::NONE);
@@ -314,10 +314,10 @@ TEST_F(FrameGraphTest, Basic) {
                 Texture const& gbuf1 = resources.get(data.gbuf1);
                 Texture const& gbuf2 = resources.get(data.gbuf2);
                 Texture const& gbuf3 = resources.get(data.gbuf3);
-                EXPECT_FALSE((bool)debugBuffer.texture);
-                EXPECT_TRUE((bool)gbuf1.texture);
-                EXPECT_TRUE((bool)gbuf2.texture);
-                EXPECT_TRUE((bool)gbuf3.texture);
+                EXPECT_FALSE((bool)debugBuffer.handle);
+                EXPECT_TRUE((bool)gbuf1.handle);
+                EXPECT_TRUE((bool)gbuf2.handle);
+                EXPECT_TRUE((bool)gbuf3.handle);
                 auto rp = resources.getRenderPassInfo();
                 EXPECT_FALSE((bool)rp.target);
             });
@@ -346,12 +346,12 @@ TEST_F(FrameGraphTest, Basic) {
             [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
                 Texture const& lightingBuffer = resources.get(data.lightingBuffer);
                 Texture const& backBuffer = resources.get(data.backBuffer);
-                EXPECT_TRUE((bool)lightingBuffer.texture);
-                EXPECT_TRUE((bool)backBuffer.texture);
-                EXPECT_FALSE((bool)resources.get(data.destroyed.depth).texture);
-                EXPECT_FALSE((bool)resources.get(data.destroyed.gbuf1).texture);
-                EXPECT_FALSE((bool)resources.get(data.destroyed.gbuf2).texture);
-                EXPECT_FALSE((bool)resources.get(data.destroyed.gbuf3).texture);
+                EXPECT_TRUE((bool)lightingBuffer.handle);
+                EXPECT_TRUE((bool)backBuffer.handle);
+                EXPECT_FALSE((bool)resources.get(data.destroyed.depth).handle);
+                EXPECT_FALSE((bool)resources.get(data.destroyed.gbuf1).handle);
+                EXPECT_FALSE((bool)resources.get(data.destroyed.gbuf2).handle);
+                EXPECT_FALSE((bool)resources.get(data.destroyed.gbuf3).handle);
 
                 EXPECT_EQ(resources.getUsage(data.lightingBuffer),  Texture::Usage::SAMPLEABLE | Texture::Usage::COLOR_ATTACHMENT);
                 EXPECT_EQ(resources.getUsage(data.backBuffer),                                   Texture::Usage::COLOR_ATTACHMENT);
@@ -374,7 +374,7 @@ TEST_F(FrameGraphTest, Basic) {
 }
 
 TEST_F(FrameGraphTest, ImportResource) {
-    Texture outputTexture{ .texture = Handle<HwTexture>{ 0x1234 }};
+    Texture outputTexture{ .handle = Handle<HwTexture>{ 0x1234 }};
     FrameGraphId<Texture> output = fg.import("Imported Texture", Texture::Descriptor{
             .width = 320,
             .height = 200
@@ -396,7 +396,7 @@ TEST_F(FrameGraphTest, ImportResource) {
             },
             [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
                 Texture const& texture = resources.get(data.output);
-                EXPECT_EQ(texture.texture.getId(), 0x1234);
+                EXPECT_EQ(texture.handle.getId(), 0x1234);
             });
 
     fg.present(pass->output);

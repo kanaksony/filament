@@ -209,7 +209,7 @@ void RenderPassNode::RenderTargetData::devirtualize(FrameGraph& fg,
             if (attachmentInfo[i].isInitialized()) {
                 auto const* pResource = static_cast<Resource<Texture> const*>(
                         fg.getResource(attachmentInfo[i]));
-                info[i].handle = pResource->resource.texture;
+                info[i].handle = pResource->resource.handle;
                 info[i].level = pResource->subResourceDescriptor.level;
                 info[i].layer = pResource->subResourceDescriptor.layer;
             }
