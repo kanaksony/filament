@@ -375,28 +375,43 @@ TEST_F(FrameGraphTest, Basic) {
 
 TEST_F(FrameGraphTest, ImportResource) {
     Texture outputTexture{ .handle = Handle<HwTexture>{ 0x1234 }};
-    FrameGraphId<Texture> output = fg.import("Imported Texture", Texture::Descriptor{
-            .width = 320,
-            .height = 200
-    }, outputTexture);
+    Texture inputTexture{ .handle = Handle<HwTexture>{ 0x3141 }};
+
+    FrameGraphId<Texture> output = fg.import("Imported output texture", Texture::Descriptor{
+            .width = 320, .height = 200 }, Texture::Usage::COLOR_ATTACHMENT, outputTexture);
+    FrameGraphId<Texture> input = fg.import("Imported input texture", Texture::Descriptor{
+            .width = 640, .height = 400 }, Texture::Usage::SAMPLEABLE, inputTexture);
 
     EXPECT_TRUE(fg.isValid(output));
+    EXPECT_TRUE(fg.isValid(input));
 
     struct PassData {
+        FrameGraphId<Texture> input;
         FrameGraphId<Texture> output;
     };
     auto& pass = fg.addPass<PassData>("Pass", [&](FrameGraph::Builder& builder, auto& data) {
-                auto const& desc = builder.getDescriptor(output);
-                EXPECT_EQ(desc.width, 320);
-                EXPECT_EQ(desc.height, 200);
+                auto const& descOutput = builder.getDescriptor(output);
+                EXPECT_EQ(descOutput.width, 320);
+                EXPECT_EQ(descOutput.height, 200);
+
+                auto const& descInput = builder.getDescriptor(input);
+                EXPECT_EQ(descInput.width, 640);
+                EXPECT_EQ(descInput.height, 400);
+
+                EXPECT_ANY_THROW( builder.write(output, Texture::Usage::UPLOADABLE) );
 
                 data.output = builder.write(output, Texture::Usage::COLOR_ATTACHMENT);
                 EXPECT_TRUE(fg.isValid(output)); // output is expect valid here because we never read before
                 EXPECT_TRUE(fg.isValid(data.output));
+
+                data.input = builder.read(input, Texture::Usage::SAMPLEABLE);
+                EXPECT_TRUE(fg.isValid(data.input));
             },
             [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
-                Texture const& texture = resources.get(data.output);
-                EXPECT_EQ(texture.handle.getId(), 0x1234);
+                Texture const& output = resources.get(data.output);
+                Texture const& input = resources.get(data.input);
+                EXPECT_EQ(output.handle.getId(), 0x1234);
+                EXPECT_EQ(input.handle.getId(), 0x3141);
             });
 
     fg.present(pass->output);

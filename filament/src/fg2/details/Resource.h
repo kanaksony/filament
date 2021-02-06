@@ -22,6 +22,8 @@
 #include "fg2/RenderTarget.h"
 #include "fg2/details/DependencyGraph.h"
 
+#include <utils/Panic.h>
+
 namespace filament {
 class ResourceAllocatorInterface;
 } // namespace::filament
@@ -137,7 +139,7 @@ public:
 
     // pass Node to resource Node edge (a write to)
     virtual bool connect(DependencyGraph& graph,
-            PassNode* passNode, ResourceNode* resourceNode, Usage u) noexcept {
+            PassNode* passNode, ResourceNode* resourceNode, Usage u) {
         auto* edge = new ResourceEdge(graph,
                 toDependencyGraphNode(passNode), toDependencyGraphNode(resourceNode), u);
         setIncomingEdge(resourceNode, edge);
@@ -147,7 +149,7 @@ public:
 
     // resource Node to pass Node edge (a read from)
     virtual bool connect(DependencyGraph& graph,
-            ResourceNode* resourceNode, PassNode* passNode, Usage u) noexcept {
+            ResourceNode* resourceNode, PassNode* passNode, Usage u) {
         auto* edge = new ResourceEdge(graph,
                 toDependencyGraphNode(resourceNode), toDependencyGraphNode(passNode), u);
         addOutgoingEdge(resourceNode, edge);
@@ -202,9 +204,11 @@ template<typename RESOURCE>
 class ImportedResource : public Resource<RESOURCE> {
 public:
     using Descriptor = typename RESOURCE::Descriptor;
-    ImportedResource(const char* name, Descriptor const& desc, RESOURCE const& rsrc) noexcept
+    using Usage = typename RESOURCE::Usage;
+    ImportedResource(const char* name, Descriptor const& desc, Usage usage, RESOURCE const& rsrc) noexcept
             : Resource<RESOURCE>(name, desc) {
         this->resource = rsrc;
+        this->usage = usage;
     }
 
 private:
@@ -216,6 +220,26 @@ private:
     }
 
     bool isImported() const noexcept override { return true; }
+
+    bool connect(DependencyGraph& graph,
+            PassNode* passNode, ResourceNode* resourceNode, Texture::Usage u) override {
+        if (!ASSERT_PRECONDITION_NON_FATAL((u & this->usage) == u,
+                "Requested usage %s not available on imported resource \"%s\" with usage %s",
+                utils::to_string(u).c_str(), this->name, utils::to_string(this->usage).c_str())) {
+            return false;
+        }
+        return Resource<RESOURCE>::connect(graph, passNode, resourceNode, u);
+    }
+
+    bool connect(DependencyGraph& graph,
+            ResourceNode* resourceNode, PassNode* passNode, Texture::Usage u) override {
+        if (!ASSERT_PRECONDITION_NON_FATAL((u & this->usage) == u,
+                "Requested usage %s not available on imported resource \"%s\" with usage %s",
+                utils::to_string(u).c_str(), this->name, utils::to_string(this->usage).c_str())) {
+            return false;
+        }
+        return Resource<RESOURCE>::connect(graph, resourceNode, passNode, u);
+    }
 };
 
 
@@ -231,11 +255,11 @@ public:
 
     ~ImportedRenderTarget() noexcept override;
 
-    bool connect(DependencyGraph& graph, PassNode* passNode, ResourceNode* resourceNode,
-            Texture::Usage u) noexcept override;
+    bool connect(DependencyGraph& graph,
+            PassNode* passNode, ResourceNode* resourceNode, Texture::Usage u) override;
 
-    bool connect(DependencyGraph& graph, ResourceNode* resourceNode, PassNode* passNode,
-            Texture::Usage u) noexcept override;
+    bool connect(DependencyGraph& graph,
+            ResourceNode* resourceNode, PassNode* passNode, Texture::Usage u) override;
 
     ImportedRenderTarget* asImportedRenderTarget() noexcept override { return this; }
 };

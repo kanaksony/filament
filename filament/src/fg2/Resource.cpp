@@ -60,24 +60,25 @@ ImportedRenderTarget::~ImportedRenderTarget() noexcept = default;
 ImportedRenderTarget::ImportedRenderTarget(char const* name,
         ImportedRenderTarget::Descriptor const& tdesc, RenderTarget::Descriptor const& desc,
         backend::Handle<backend::HwRenderTarget> target)
-            : ImportedResource<Texture>(name, tdesc,{}), target(target), rtdesc(desc) {
+        : ImportedResource<Texture>(name, tdesc, Texture::Usage::COLOR_ATTACHMENT, {}),
+          target(target), rtdesc(desc) {
 }
 
 bool ImportedRenderTarget::connect(DependencyGraph& graph, PassNode* passNode,
-        ResourceNode* resourceNode, backend::TextureUsage u) noexcept {
+        ResourceNode* resourceNode, backend::TextureUsage u) {
     // pass Node to resource Node edge (a write to)
     if (!ASSERT_PRECONDITION_NON_FATAL(any(u & Texture::Usage::COLOR_ATTACHMENT),
-            "Imported render target resource can only be used as a COLOR_ATTACHMENT")) {
+            "Imported render target resource \"%s\" can only be used as a COLOR_ATTACHMENT", name)) {
         return false;
     }
     return Resource::connect(graph, passNode, resourceNode, u);
 }
 
 bool ImportedRenderTarget::connect(DependencyGraph& graph, ResourceNode* resourceNode,
-        PassNode* passNode, backend::TextureUsage u) noexcept {
+        PassNode* passNode, backend::TextureUsage u) {
     // resource Node to pass Node edge (a read from)
     if (!ASSERT_PRECONDITION_NON_FATAL(any(u & Texture::Usage::COLOR_ATTACHMENT),
-            "Imported render target resource can only be used as a COLOR_ATTACHMENT")) {
+            "Imported render target resource \"%s\" can only be used as a COLOR_ATTACHMENT", name)) {
         return false;
     }
     return Resource::connect(graph, resourceNode, passNode, u);

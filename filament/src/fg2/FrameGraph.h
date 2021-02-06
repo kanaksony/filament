@@ -292,7 +292,9 @@ public:
      */
     template<typename RESOURCE>
     FrameGraphId<RESOURCE> import(const char* name,
-            typename RESOURCE::Descriptor const& desc, const RESOURCE& resource) noexcept;
+            typename RESOURCE::Descriptor const& desc,
+            typename RESOURCE::Usage usage,
+            const RESOURCE& resource) noexcept;
 
     /**
      * Imports a RenderTarget as a Texture into the frame graph. Later, this
@@ -419,9 +421,11 @@ FrameGraphId<RESOURCE> FrameGraph::create(char const* name,
 }
 
 template<typename RESOURCE>
-FrameGraphId<RESOURCE> FrameGraph::import(char const* name, typename RESOURCE::Descriptor const& desc,
+FrameGraphId<RESOURCE> FrameGraph::import(char const* name,
+        typename RESOURCE::Descriptor const& desc,
+        typename RESOURCE::Usage usage,
         RESOURCE const& resource) noexcept {
-    UniquePtr<VirtualResource> vresource(mArena.make<ImportedResource<RESOURCE>>(name, desc, resource), mArena);
+    UniquePtr<VirtualResource> vresource(mArena.make<ImportedResource<RESOURCE>>(name, desc, usage, resource), mArena);
     return FrameGraphId<RESOURCE>(addResourceInternal(std::move(vresource)));
 }
 
@@ -434,7 +438,10 @@ FrameGraphId<RESOURCE> FrameGraph::read(PassNode& passNode, FrameGraphId<RESOURC
     FrameGraphId<RESOURCE> result(readInternal(input, &node, &vrsrc));
     if (result.isInitialized()) {
         Resource<RESOURCE>* resource = static_cast<Resource<RESOURCE> *>(vrsrc);
-        resource->connect(mGraph, node, &passNode, usage);
+        if (!resource->connect(mGraph, node, &passNode, usage)) {
+            // FIXME: we should undo the readInternal
+            return {};
+        }
     }
     return result;
 }
@@ -447,7 +454,10 @@ FrameGraphId<RESOURCE> FrameGraph::write(PassNode& passNode, FrameGraphId<RESOUR
     FrameGraphId<RESOURCE> result(writeInternal(input, &node, &vrsrc));
     if (result.isInitialized()) {
         Resource<RESOURCE>* resource = static_cast<Resource<RESOURCE>*>(vrsrc);
-        resource->connect(mGraph, &passNode, node, usage);
+        if (!resource->connect(mGraph, &passNode, node, usage)) {
+            // FIXME: we should undo the writeInternal
+            return {};
+        }
     }
     return result;
 }
