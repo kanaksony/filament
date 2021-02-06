@@ -67,7 +67,7 @@ public:
          *              an id to retrieve the concrete render target in the execute phase.
          */
         RenderTarget useAsRenderTarget(const char* name,
-                RenderTarget::Descriptor const& desc) noexcept;
+                RenderTarget::Descriptor const& desc);
 
         /**
          * Helper to easily declare a render target with a single color attachment.
@@ -82,7 +82,7 @@ public:
          * @param color color attachment subresource
          * @return the id of this Render Target
          */
-        uint32_t useAsRenderTarget(FrameGraphId<Texture>* color) noexcept;
+        uint32_t useAsRenderTarget(FrameGraphId<Texture>* color);
 
         /**
          * Helper to easily declare a render target with a color and depth attachment.
@@ -101,7 +101,7 @@ public:
          * @return the id of this Render Target
          */
         uint32_t useAsRenderTarget(FrameGraphId<Texture>* color,
-                FrameGraphId<Texture>* depth) noexcept;
+                FrameGraphId<Texture>* depth);
 
 
         /**
@@ -307,6 +307,15 @@ public:
     FrameGraphId<Texture> import(const char* name, RenderTarget::Descriptor const& desc,
             backend::Handle<backend::HwRenderTarget> target);
 
+
+    /**
+     * Check that a handle is initialized and valid.
+     * @param handle handle to test validity for
+     * @return true of the handle is valid, false otherwise.
+     */
+    bool isValid(FrameGraphHandle handle) const;
+
+
 private:
     friend class FrameGraphResources;
     friend class PassNode;
@@ -329,8 +338,10 @@ private:
     void addPresentPass(std::function<void(Builder&)> setup) noexcept;
     Builder addPassInternal(const char* name, PassExecutor* base) noexcept;
     FrameGraphHandle addResourceInternal(UniquePtr<VirtualResource> resource) noexcept;
-    FrameGraphHandle readInternal(FrameGraphHandle handle, ResourceNode** pNode, VirtualResource** pResource) noexcept;
-    FrameGraphHandle writeInternal(FrameGraphHandle handle, ResourceNode** pNode, VirtualResource** pResource) noexcept;
+    FrameGraphHandle readInternal(FrameGraphHandle handle, ResourceNode** pNode, VirtualResource** pResource);
+    FrameGraphHandle writeInternal(FrameGraphHandle handle, ResourceNode** pNode, VirtualResource** pResource);
+
+    bool assertValid(FrameGraphHandle handle) const;
 
     template<typename RESOURCE>
     FrameGraphId<RESOURCE> create(char const* name,
@@ -367,10 +378,6 @@ private:
 
     ResourceNode const* getResourceNode(FrameGraphHandle handle) const noexcept {
         return const_cast<FrameGraph*>(this)->getResourceNode(handle);
-    }
-
-    bool isValid(FrameGraphHandle handle) const noexcept {
-        return handle.version == getResource(handle)->version;
     }
 
     ResourceAllocatorInterface& mResourceAllocator;
@@ -425,7 +432,7 @@ FrameGraphId<RESOURCE> FrameGraph::read(PassNode& passNode, FrameGraphId<RESOURC
     VirtualResource* vrsrc;
     // TODO: ensure that we're not reading twice from the same pass
     FrameGraphId<RESOURCE> result(readInternal(input, &node, &vrsrc));
-    if (result.isValid()) {
+    if (result.isInitialized()) {
         Resource<RESOURCE>* resource = static_cast<Resource<RESOURCE> *>(vrsrc);
         resource->connect(mGraph, node, &passNode, usage);
     }
@@ -438,7 +445,7 @@ FrameGraphId<RESOURCE> FrameGraph::write(PassNode& passNode, FrameGraphId<RESOUR
     ResourceNode* node;
     VirtualResource* vrsrc;
     FrameGraphId<RESOURCE> result(writeInternal(input, &node, &vrsrc));
-    if (result.isValid()) {
+    if (result.isInitialized()) {
         Resource<RESOURCE>* resource = static_cast<Resource<RESOURCE>*>(vrsrc);
         resource->connect(mGraph, &passNode, node, usage);
     }

@@ -44,7 +44,7 @@ private:
 
 public:
     FrameGraphHandle(FrameGraphHandle const& rhs) noexcept = default;
-    FrameGraphHandle(FrameGraphHandle&& rhs) noexcept : index(rhs.index) {
+    FrameGraphHandle(FrameGraphHandle&& rhs) noexcept : index(rhs.index), version(rhs.version) {
         rhs.index = UNINITIALIZED; rhs.version = 0; }
     FrameGraphHandle& operator=(FrameGraphHandle const& rhs) noexcept = default;
     FrameGraphHandle& operator=(FrameGraphHandle&& rhs) noexcept  {
@@ -53,7 +53,7 @@ public:
         return *this;
     }
 
-    bool isValid() const noexcept { return index != UNINITIALIZED; }
+    bool isInitialized() const noexcept { return index != UNINITIALIZED; }
 
     void clear() noexcept { index = UNINITIALIZED; version = 0; }
 

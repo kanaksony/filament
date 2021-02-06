@@ -66,7 +66,7 @@ void RenderPassNode::execute(FrameGraphResources const& resources,
 }
 
 RenderTarget RenderPassNode::declareRenderTarget(FrameGraph& fg, FrameGraph::Builder& builder,
-        const char* name, RenderTarget::Descriptor const& descriptor) noexcept {
+        const char* name, RenderTarget::Descriptor const& descriptor) {
 
     RenderTargetData data;
     data.name = name;
@@ -85,9 +85,9 @@ RenderTarget RenderPassNode::declareRenderTarget(FrameGraph& fg, FrameGraph::Bui
     // retrieve the ResourceNode of the attachments coming to us -- this will be used later
     // to compute the discard flags.
     for (size_t i = 0; i < 6; i++) {
-        if (descriptor.attachments.array[i].isValid()) {
+        if (descriptor.attachments.array[i].isInitialized()) {
             data.incoming[i] = fg.getResourceNode(attachments.array[i]);
-            attachments.color[i] = builder.write(attachments.array[i], usages[i]);
+            attachments.array[i] = builder.write(attachments.array[i], usages[i]);
             data.outgoing[i] = fg.getResourceNode(attachments.array[i]);
             data.attachmentInfo[i] = attachments.array[i];
             // if the outgoing node is the same than the incoming node, it means we in fact
@@ -99,7 +99,7 @@ RenderTarget RenderPassNode::declareRenderTarget(FrameGraph& fg, FrameGraph::Bui
     }
 
     // Handle our special imported render target
-    if (attachments.color[0].isValid()) {
+    if (attachments.color[0].isInitialized()) {
         VirtualResource* pResource = fg.getResource(attachments.color[0]);
         ImportedRenderTarget* pImportedRenderTarget = pResource->asImportedRenderTarget();
         if (pImportedRenderTarget) {
@@ -139,7 +139,7 @@ void RenderPassNode::resolve() noexcept {
         for (size_t i = 0; i < 6; i++) {
             // we use 'outgoing' has a proxy for 'do we have an attachment here?'
             if (rt.outgoing[i]) {
-                assert(rt.descriptor.attachments.array[i].isValid());
+                assert(rt.descriptor.attachments.array[i].isInitialized());
 
                 rt.targetBufferFlags |= flags[i];
 
@@ -206,7 +206,7 @@ void RenderPassNode::RenderTargetData::devirtualize(FrameGraph& fg,
 
         backend::TargetBufferInfo info[6] = {};
         for (size_t i = 0; i < 6; i++) {
-            if (attachmentInfo[i].isValid()) {
+            if (attachmentInfo[i].isInitialized()) {
                 auto const* pResource = static_cast<Resource<Texture> const*>(
                         fg.getResource(attachmentInfo[i]));
                 info[i].handle = pResource->resource.texture;

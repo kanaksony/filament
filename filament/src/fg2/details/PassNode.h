@@ -73,7 +73,7 @@ public:
     ~RenderPassNode() noexcept override;
 
     RenderTarget declareRenderTarget(FrameGraph& fg, FrameGraph::Builder& builder,
-            const char* name, RenderTarget::Descriptor const& descriptor) noexcept;
+            const char* name, RenderTarget::Descriptor const& descriptor);
 
     RenderTargetData const& getRenderTargetData(uint32_t id) const noexcept;
 

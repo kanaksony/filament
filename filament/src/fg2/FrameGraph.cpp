@@ -24,6 +24,8 @@
 #include <backend/DriverEnums.h>
 #include <backend/Handle.h>
 
+#include <utils/Panic.h>
+
 namespace filament::fg2 {
 
 FrameGraph::Builder::Builder(FrameGraph& fg, PassNode& pass) noexcept
@@ -41,13 +43,13 @@ const char* FrameGraph::Builder::getName(FrameGraphHandle handle) const noexcept
 }
 
 RenderTarget FrameGraph::Builder::useAsRenderTarget(const char* name,
-        RenderTarget::Descriptor const& desc) noexcept {
+        RenderTarget::Descriptor const& desc) {
     // it's safe here to cast to RenderPassNode because we can't be here for a PresentPassNode
     // also only RenderPassNodes have the concept of render targets.
     return static_cast<RenderPassNode&>(mPass).declareRenderTarget(mFrameGraph, *this, name, desc);
 }
 
-uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>* color) noexcept {
+uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>* color) {
     assert(color);
     auto[attachments, id] = useAsRenderTarget(getName(*color),
             { .attachments = { .color = { *color }}});
@@ -56,7 +58,7 @@ uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>* color) no
 }
 
 uint32_t FrameGraph::Builder::useAsRenderTarget(FrameGraphId<Texture>* color,
-        FrameGraphId<Texture>* depth) noexcept {
+        FrameGraphId<Texture>* depth) {
     assert(color || depth);
     RenderTarget::Descriptor desc;
     if (color) {
@@ -92,6 +94,14 @@ FrameGraph::FrameGraph(ResourceAllocatorInterface& resourceAllocator)
 }
 
 FrameGraph::~FrameGraph() = default;
+
+void FrameGraph::reset() noexcept {
+    // the order of destruction is important here
+    mPassNodes.clear();
+    mResourceNodes.clear();
+    mResources.clear();
+    mResourceSlots.clear();
+}
 
 FrameGraph& FrameGraph::compile() noexcept {
     DependencyGraph& dependencyGraph = mGraph;
@@ -208,13 +218,12 @@ FrameGraphHandle FrameGraph::addResourceInternal(UniquePtr<VirtualResource> reso
 }
 
 FrameGraphHandle FrameGraph::readInternal(FrameGraphHandle handle,
-        ResourceNode** pNode, VirtualResource** pResource) noexcept {
+        ResourceNode** pNode, VirtualResource** pResource) {
     *pNode = nullptr;
     *pResource = nullptr;
-    if (!handle.isValid()) {
-        return handle;
+    if (!assertValid(handle)) {
+        return {};
     }
-
     ResourceSlot const& slot = getResourceSlot(handle);
     assert((size_t)slot.rid < mResources.size());
     assert((size_t)slot.nid < mResourceNodes.size());
@@ -224,11 +233,11 @@ FrameGraphHandle FrameGraph::readInternal(FrameGraphHandle handle,
 }
 
 FrameGraphHandle FrameGraph::writeInternal(FrameGraphHandle handle,
-        ResourceNode** pNode, VirtualResource** pResource) noexcept {
+        ResourceNode** pNode, VirtualResource** pResource) {
     *pNode = nullptr;
     *pResource = nullptr;
-    if (!handle.isValid()) {
-        return handle;
+    if (!assertValid(handle)) {
+        return {};
     }
 
     // update the slot with new ResourceNode index
@@ -267,12 +276,22 @@ FrameGraphId<Texture> FrameGraph::import(char const* name, RenderTarget::Descrip
     return FrameGraphId<Texture>(addResourceInternal(std::move(vresource)));
 }
 
-void FrameGraph::reset() noexcept {
-    // the order of destruction is important here
-    mPassNodes.clear();
-    mResourceNodes.clear();
-    mResources.clear();
-    mResourceSlots.clear();
+bool FrameGraph::isValid(FrameGraphHandle handle) const {
+    // Code below is written this way so we can set breakpoints easily.
+    if (!handle.isInitialized()) {
+        return false;
+    }
+    VirtualResource const* const pResource = getResource(handle);
+    if (handle.version != pResource->version) {
+        return false;
+    }
+    return true;
+}
+
+bool FrameGraph::assertValid(FrameGraphHandle handle) const {
+    return ASSERT_PRECONDITION_NON_FATAL(isValid(handle),
+            "Resource handle is invalid or uninitialized {id=%u, version=%u}",
+            (int)handle.index, (int)handle.version);
 }
 
 } // namespace filament::fg2
