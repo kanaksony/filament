@@ -31,6 +31,7 @@ ResourceNode::~ResourceNode() noexcept {
     for (auto* pEdge : mReaders) {
         resource->destroyEdge(pEdge);
     }
+    delete mParent;
 }
 
 void ResourceNode::onCulled(DependencyGraph* graph) noexcept {
@@ -50,8 +51,10 @@ void ResourceNode::setIncomingEdge(ResourceEdgeBase* edge) noexcept {
 }
 
 bool ResourceNode::hasActiveReaders() const noexcept {
+    // here we don't use mReaders because this wouldn't account for subresources
     DependencyGraph& dependencyGraph = mFrameGraph.getGraph();
-    for (auto const& reader : mReaders) {
+    auto const& readers = dependencyGraph.getOutgoingEdges(this);
+    for (auto const& reader : readers) {
         if (!dependencyGraph.getNode(reader->to)->isCulled()) {
             return true;
         }
@@ -65,6 +68,11 @@ void ResourceNode::resolveResourceUsage(DependencyGraph& graph) noexcept {
     if (pResource->refcount) {
         pResource->resolveUsage(graph, mReaders.data(), mReaders.size(), mWriter);
     }
+}
+
+void ResourceNode::setParent(ResourceNode const* pParentNode) noexcept {
+    mParent = new DependencyGraph::Edge(mFrameGraph.getGraph(),
+            this, const_cast<ResourceNode *>(pParentNode));
 }
 
 utils::CString ResourceNode::graphvizify() const noexcept {
@@ -99,7 +107,7 @@ utils::CString ResourceNode::graphvizify() const noexcept {
 }
 
 utils::CString ResourceNode::graphvizifyEdgeColor() const noexcept {
-    return utils::CString{"darkolivegreen"};
+    return utils::CString{ mParent ? "skyblue" : "darkolivegreen" };
 }
 
 } // namespace filament::fg2

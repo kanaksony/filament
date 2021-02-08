@@ -212,8 +212,18 @@ FrameGraphHandle FrameGraph::addResourceInternal(UniquePtr<VirtualResource> reso
     slot.rid = mResources.size();
     slot.nid = mResourceNodes.size();
     mResources.push_back(std::move(resource));
-    ResourceNode* node = mArena.make<ResourceNode>(*this, handle);
-    mResourceNodes.emplace_back(node, mArena);
+    ResourceNode* pNode = mArena.make<ResourceNode>(*this, handle);
+    mResourceNodes.emplace_back(pNode, mArena);
+    return handle;
+}
+
+FrameGraphHandle FrameGraph::addSubResourceInternal(FrameGraphHandle parent,
+        UniquePtr<VirtualResource> resource) noexcept {
+    FrameGraphHandle handle = addResourceInternal(std::move(resource));
+    assert(handle.isInitialized());
+    auto* pParentNode = getResourceNode(parent);
+    auto* pNode = static_cast<ResourceNode*>(getResourceNode(handle));
+    pNode->setParent(pParentNode);
     return handle;
 }
 

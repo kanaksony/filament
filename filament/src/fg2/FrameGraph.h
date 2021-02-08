@@ -130,9 +130,11 @@ public:
          * @return              A handle to the subresource
          */
         template<typename RESOURCE>
-        inline FrameGraphId<RESOURCE> createSubresource(FrameGraphId<RESOURCE>* parent,
+        inline FrameGraphId<RESOURCE> createSubresource(FrameGraphId<RESOURCE> parent,
                 const char* name,
-                typename RESOURCE::SubResourceDescriptor const& desc = {}) noexcept;
+                typename RESOURCE::SubResourceDescriptor const& desc = {}) noexcept {
+            return mFrameGraph.createSubresource<RESOURCE>(parent, name, desc);
+        }
 
 
         /**
@@ -145,7 +147,7 @@ public:
          */
         template<typename RESOURCE>
         inline FrameGraphId<RESOURCE> read(FrameGraphId<RESOURCE> input,
-                typename RESOURCE::Usage usage = {}) {
+                typename RESOURCE::Usage usage = RESOURCE::DEFAULT_R_USAGE) {
             return mFrameGraph.read<RESOURCE>(mPass, input, usage);
         }
 
@@ -159,7 +161,7 @@ public:
          */
         template<typename RESOURCE>
         FrameGraphId<RESOURCE> write(FrameGraphId<RESOURCE> input,
-                typename RESOURCE::Usage usage = {}) {
+                typename RESOURCE::Usage usage = RESOURCE::DEFAULT_W_USAGE) {
             return mFrameGraph.write<RESOURCE>(mPass, input, usage);
         }
 
@@ -340,6 +342,7 @@ private:
     void addPresentPass(std::function<void(Builder&)> setup) noexcept;
     Builder addPassInternal(const char* name, PassExecutor* base) noexcept;
     FrameGraphHandle addResourceInternal(UniquePtr<VirtualResource> resource) noexcept;
+    FrameGraphHandle addSubResourceInternal(FrameGraphHandle parent, UniquePtr<VirtualResource> resource) noexcept;
     FrameGraphHandle readInternal(FrameGraphHandle handle, ResourceNode** pNode, VirtualResource** pResource);
     FrameGraphHandle writeInternal(FrameGraphHandle handle, ResourceNode** pNode, VirtualResource** pResource);
 
@@ -350,6 +353,10 @@ private:
             typename RESOURCE::Descriptor const& desc) noexcept;
 
     template<typename RESOURCE>
+    FrameGraphId<RESOURCE> createSubresource(FrameGraphId<RESOURCE> parent,
+            char const* name, typename RESOURCE::SubResourceDescriptor const& desc) noexcept;
+
+        template<typename RESOURCE>
     FrameGraphId<RESOURCE> read(PassNode& passNode,
             FrameGraphId<RESOURCE> input, typename RESOURCE::Usage usage);
 
@@ -409,11 +416,13 @@ Pass<Data, Execute>& FrameGraph::addPass(char const* name, Setup setup, Execute&
 }
 
 template<typename RESOURCE>
+UTILS_NOINLINE
 void FrameGraph::present(FrameGraphId<RESOURCE> input) {
     addPresentPass([&](Builder& builder) { builder.read(input); });
 }
 
 template<typename RESOURCE>
+UTILS_NOINLINE
 FrameGraphId<RESOURCE> FrameGraph::create(char const* name,
         typename RESOURCE::Descriptor const& desc) noexcept {
     UniquePtr<VirtualResource> vresource(mArena.make<Resource<RESOURCE>>(name, desc), mArena);
@@ -421,6 +430,16 @@ FrameGraphId<RESOURCE> FrameGraph::create(char const* name,
 }
 
 template<typename RESOURCE>
+UTILS_NOINLINE
+FrameGraphId<RESOURCE> FrameGraph::createSubresource(FrameGraphId<RESOURCE> parent,
+        char const* name, typename RESOURCE::SubResourceDescriptor const& desc) noexcept {
+    auto* pParentResource = static_cast<Resource<RESOURCE>*>(getResource(parent));
+    UniquePtr<VirtualResource> vresource(mArena.make<Resource<RESOURCE>>(pParentResource, name, desc), mArena);
+    return FrameGraphId<RESOURCE>(addSubResourceInternal(parent, std::move(vresource)));
+}
+
+template<typename RESOURCE>
+UTILS_NOINLINE
 FrameGraphId<RESOURCE> FrameGraph::import(char const* name,
         typename RESOURCE::Descriptor const& desc,
         typename RESOURCE::Usage usage,
@@ -430,6 +449,7 @@ FrameGraphId<RESOURCE> FrameGraph::import(char const* name,
 }
 
 template<typename RESOURCE>
+UTILS_NOINLINE
 FrameGraphId<RESOURCE> FrameGraph::read(PassNode& passNode, FrameGraphId<RESOURCE> input,
         typename RESOURCE::Usage usage) {
     ResourceNode* node;
@@ -447,6 +467,7 @@ FrameGraphId<RESOURCE> FrameGraph::read(PassNode& passNode, FrameGraphId<RESOURC
 }
 
 template<typename RESOURCE>
+UTILS_NOINLINE
 FrameGraphId<RESOURCE> FrameGraph::write(PassNode& passNode, FrameGraphId<RESOURCE> input,
         typename RESOURCE::Usage usage) {
     ResourceNode* node;

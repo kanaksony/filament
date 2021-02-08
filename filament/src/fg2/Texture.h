@@ -59,6 +59,8 @@ struct Texture {
 
     /** Usage for read and write */
     using Usage = backend::TextureUsage;
+    static constexpr Usage DEFAULT_R_USAGE = Usage::SAMPLEABLE;
+    static constexpr Usage DEFAULT_W_USAGE = Usage::COLOR_ATTACHMENT;
 
     /**
      * Create the concrete resource

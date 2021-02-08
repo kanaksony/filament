@@ -53,6 +53,8 @@ public:
 
     void resolveResourceUsage(DependencyGraph& graph) noexcept;
 
+    void setParent(ResourceNode const* pParentNode) noexcept;
+
 private:
     // virtuals from DependencyGraph::Node
     char const* getName() const noexcept override;
@@ -64,6 +66,7 @@ private:
     FrameGraph& mFrameGraph;
     std::vector<ResourceEdgeBase *> mReaders;
     ResourceEdgeBase* mWriter = nullptr;
+    DependencyGraph::Edge* mParent = nullptr;
 };
 
 } // namespace filament::fg2

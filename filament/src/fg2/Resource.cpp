@@ -51,6 +51,11 @@ void VirtualResource::neededByPass(PassNode* pNode) noexcept {
     first = first ? first : pNode;
     // figure out which is the last pass to need this resource
     last = pNode;
+
+    // also extend the lifetime of our parent resource if any
+    if (parent != this) {
+        parent->neededByPass(pNode);
+    }
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -48,6 +48,7 @@ public:
 class VirtualResource {
 public:
     // constants
+    VirtualResource* parent;
     const char* const name;
 
     // updated by builder
@@ -58,13 +59,24 @@ public:
     PassNode* first = nullptr;  // pass that needs to instantiate the resource
     PassNode* last = nullptr;   // pass that can destroy the resource
 
-    VirtualResource(const char* name) noexcept : name(name) { }
+    explicit VirtualResource(const char* name) noexcept : parent(this), name(name) { }
+    VirtualResource(VirtualResource* parent, const char* name) noexcept : parent(parent), name(name) { }
     VirtualResource(VirtualResource const&) = delete;
     VirtualResource& operator=(VirtualResource const&) = delete;
     virtual ~VirtualResource() noexcept;
 
     // updates first/last/refcount
     void neededByPass(PassNode* pNode) noexcept;
+
+    bool isSubResource() const noexcept { return parent != this; }
+
+    VirtualResource* getResource() {
+        VirtualResource* p = this;
+        while (p->parent != p) {
+            p = p->parent;
+        }
+        return p;
+    }
 
     /*
      * Called during FrameGraph::compile(), this gives an opportunity for this resource to
@@ -135,6 +147,11 @@ public:
         : VirtualResource(name), descriptor(desc) {
     }
 
+    Resource(Resource* parent, const char* name, SubResourceDescriptor const& desc) noexcept
+            : VirtualResource(parent, name),
+              descriptor(parent->descriptor), subResourceDescriptor(desc) {
+    }
+
     ~Resource() noexcept = default;
 
     // pass Node to resource Node edge (a write to)
@@ -171,10 +188,17 @@ protected:
                 ResourceEdge const* const edge = static_cast<ResourceEdge const*>(edges[i]);
                 usage |= edge->usage;
             }
-            if (writer) {
-                ResourceEdge const* const edge = static_cast<ResourceEdge const*>(writer);
-                usage |= edge->usage;
-            }
+        }
+        if (writer) {
+            ResourceEdge const* const edge = static_cast<ResourceEdge const*>(writer);
+            usage |= edge->usage;
+        }
+
+        // propagate usage bits to the parents
+        Resource* p = this;
+        while (p != p->parent) {
+            p = static_cast<Resource*>(p->parent);
+            p->usage |= usage;
         }
     }
 
@@ -184,11 +208,18 @@ protected:
     }
 
     void devirtualize(ResourceAllocatorInterface& resourceAllocator) noexcept override {
-        resource.create(resourceAllocator, name, descriptor, usage);
+        if (!isSubResource()) {
+            resource.create(resourceAllocator, name, descriptor, usage);
+        } else {
+            // resource is guaranteed to be initialized before we are by construction
+            resource = static_cast<Resource const*>(parent)->resource;
+        }
     }
 
     void destroy(ResourceAllocatorInterface& resourceAllocator) noexcept override {
-        resource.destroy(resourceAllocator);
+        if (!isSubResource()) {
+            resource.destroy(resourceAllocator);
+        }
     }
 
     utils::CString usageString() const noexcept override {

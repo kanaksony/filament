@@ -57,7 +57,7 @@ public:
      * @return          Reference to the concrete resource
      */
     template<typename RESOURCE>
-    inline RESOURCE const& get(FrameGraphId<RESOURCE> handle) const noexcept;
+    RESOURCE const& get(FrameGraphId<RESOURCE> handle) const noexcept;
 
     /**
      * Retrieves the descriptor associated to a resource
@@ -66,7 +66,16 @@ public:
      * @return          Reference to the descriptor
      */
     template<typename RESOURCE>
-    inline typename RESOURCE::Descriptor const& getDescriptor(FrameGraphId<RESOURCE> handle) const noexcept;
+    typename RESOURCE::Descriptor const& getDescriptor(FrameGraphId<RESOURCE> handle) const noexcept;
+
+    /**
+     * Retrieves the descriptor associated to a subresource
+     * @tparam RESOURCE Type of the resource
+     * @param handle    Handle to a virtual resource
+     * @return          Reference to the subresource descriptor
+     */
+    template<typename RESOURCE>
+    typename RESOURCE::SubResourceDescriptor const& getSubResourceDescriptor(FrameGraphId<RESOURCE> handle) const noexcept;
 
     /**
      * Retrieves the usage associated to a resource
@@ -75,7 +84,7 @@ public:
      * @return          Reference to the descriptor
      */
     template<typename RESOURCE>
-    inline typename RESOURCE::Usage const& getUsage(FrameGraphId<RESOURCE> handle) const noexcept;
+    typename RESOURCE::Usage const& getUsage(FrameGraphId<RESOURCE> handle) const noexcept;
 
     /**
      * Retrieves the render pass information associated with Builder::userRenderTarget() with the
@@ -104,6 +113,12 @@ typename RESOURCE::Descriptor const& FrameGraphResources::getDescriptor(
         FrameGraphId<RESOURCE> handle) const noexcept {
     // TODO: assert the resource exists and is devirtualized
     return static_cast<Resource<RESOURCE> const*>(getResource(handle))->descriptor;
+}
+
+template<typename RESOURCE>
+typename RESOURCE::SubResourceDescriptor const& FrameGraphResources::getSubResourceDescriptor(
+        FrameGraphId<RESOURCE> handle) const noexcept {
+    return static_cast<Resource<RESOURCE> const*>(getResource(handle))->subResourceDescriptor;
 }
 
 template<typename RESOURCE>

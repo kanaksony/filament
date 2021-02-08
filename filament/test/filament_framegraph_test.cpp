@@ -418,3 +418,98 @@ TEST_F(FrameGraphTest, ImportResource) {
     fg.compile();
     fg.execute(driverApi);
 }
+
+TEST_F(FrameGraphTest, SubResources) {
+
+    struct PassData {
+        FrameGraphId<Texture> output;
+        FrameGraphId<Texture> outputs[4];
+    };
+    auto& pass = fg.addPass<PassData>("Pass", [&](FrameGraph::Builder& builder, auto& data) {
+                data.output = builder.create<Texture>("Color buffer", {.width=16, .height=32, .levels=4});
+                for (int i = 0; i < 4; i++) {
+                    data.outputs[i] = builder.createSubresource(data.output, "Color mip", { .level=uint8_t(i) });
+                }
+                EXPECT_TRUE(fg.isValid(data.output));
+                EXPECT_TRUE(fg.isValid(data.outputs[0]));
+                EXPECT_TRUE(fg.isValid(data.outputs[1]));
+                EXPECT_TRUE(fg.isValid(data.outputs[2]));
+                EXPECT_TRUE(fg.isValid(data.outputs[3]));
+
+                for (int i = 0; i < 4; i++) {
+                    builder.useAsRenderTarget(&data.outputs[i]);
+                }
+
+                EXPECT_TRUE(fg.isValid(data.outputs[0]));
+                EXPECT_TRUE(fg.isValid(data.outputs[1]));
+                EXPECT_TRUE(fg.isValid(data.outputs[2]));
+                EXPECT_TRUE(fg.isValid(data.outputs[3]));
+            },
+            [=](FrameGraphResources const& resources, auto const& data,
+                    backend::DriverApi& driver) {
+                auto outputDesc = resources.getDescriptor(data.output);
+                auto output = resources.get(data.output);
+                EXPECT_TRUE(output.handle);
+                EXPECT_EQ(resources.getUsage(data.output), Texture::Usage::COLOR_ATTACHMENT | Texture::Usage::SAMPLEABLE);
+
+                EXPECT_TRUE(resources.get(data.outputs[0]).handle);
+                EXPECT_TRUE(resources.get(data.outputs[1]).handle);
+                EXPECT_TRUE(resources.get(data.outputs[2]).handle);
+                EXPECT_TRUE(resources.get(data.outputs[3]).handle);
+                EXPECT_EQ(resources.getUsage(data.outputs[0]), Texture::Usage::COLOR_ATTACHMENT | Texture::Usage::SAMPLEABLE);
+                EXPECT_EQ(resources.getUsage(data.outputs[1]), Texture::Usage::COLOR_ATTACHMENT);
+                EXPECT_EQ(resources.getUsage(data.outputs[2]), Texture::Usage::COLOR_ATTACHMENT);
+                EXPECT_EQ(resources.getUsage(data.outputs[3]), Texture::Usage::COLOR_ATTACHMENT);
+
+                auto rp0 = resources.getRenderPassInfo(0);
+                auto rp1 = resources.getRenderPassInfo(1);
+                auto rp2 = resources.getRenderPassInfo(2);
+                auto rp3 = resources.getRenderPassInfo(3);
+                EXPECT_TRUE(rp0.target);
+                EXPECT_TRUE(rp1.target);
+                EXPECT_TRUE(rp2.target);
+                EXPECT_TRUE(rp3.target);
+
+                EXPECT_EQ(resources.getSubResourceDescriptor(data.outputs[0]).level, 0);
+                EXPECT_EQ(resources.getSubResourceDescriptor(data.outputs[1]).level, 1);
+                EXPECT_EQ(resources.getSubResourceDescriptor(data.outputs[2]).level, 2);
+                EXPECT_EQ(resources.getSubResourceDescriptor(data.outputs[3]).level, 3);
+
+                EXPECT_EQ(rp0.params.flags.discardStart,TargetBufferFlags::COLOR0);
+                EXPECT_EQ(rp1.params.flags.discardStart,TargetBufferFlags::COLOR0);
+                EXPECT_EQ(rp2.params.flags.discardStart,TargetBufferFlags::COLOR0);
+                EXPECT_EQ(rp3.params.flags.discardStart,TargetBufferFlags::COLOR0);
+
+                EXPECT_EQ(rp0.params.flags.discardEnd, TargetBufferFlags::NONE);
+                EXPECT_EQ(rp1.params.flags.discardEnd, TargetBufferFlags::NONE);
+                EXPECT_EQ(rp2.params.flags.discardEnd, TargetBufferFlags::NONE);
+                EXPECT_EQ(rp2.params.flags.discardEnd, TargetBufferFlags::NONE);
+            });
+
+    struct DebugPass {
+        FrameGraphId<Texture> debugBuffer;
+        FrameGraphId<Texture> subresource;
+    };
+    auto& debugPass = fg.addPass<DebugPass>("DebugPass pass",
+            [&](FrameGraph::Builder& builder, auto& data) {
+                data.subresource = builder.read(pass->outputs[0], Texture::Usage::SAMPLEABLE);
+                Texture::Descriptor desc = builder.getDescriptor(data.subresource);
+                data.debugBuffer = builder.create<Texture>("Debug buffer", desc);
+                builder.useAsRenderTarget(&data.debugBuffer);
+            },
+            [=](FrameGraphResources const& resources, auto const& data, backend::DriverApi& driver) {
+                Texture const& debugBuffer = resources.get(data.debugBuffer);
+                Texture const& subresource = resources.get(data.subresource);
+                EXPECT_TRUE((bool)debugBuffer.handle);
+                EXPECT_TRUE((bool)subresource.handle);
+                auto rp = resources.getRenderPassInfo();
+                EXPECT_TRUE((bool)rp.target);
+            });
+
+    fg.present(debugPass->debugBuffer);
+
+    fg.present(pass->output);
+    fg.compile();
+    fg.execute(driverApi);
+}
+
